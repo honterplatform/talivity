@@ -56,6 +56,118 @@ export function FooterBar({ tone = 'paper' }: { tone?: Tone }) {
   );
 }
 
+export function DecorArcs() {
+  const Couter = 2 * Math.PI * 44;
+  const outerVisible = Couter * 0.65;
+  const outerGap = Couter - outerVisible;
+
+  const Cinner = 2 * Math.PI * 36;
+  const innerVisible = Cinner * 0.4;
+  const innerGap = Cinner - innerVisible;
+
+  return (
+    <>
+      {/* Top-right outer: teal, clockwise */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -top-[115px] -right-[115px] z-0"
+        style={{
+          width: 560,
+          height: 560,
+          animation: 'arc-drift 60s linear infinite',
+        }}
+      >
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="#33D3C9"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeDasharray={`${outerVisible} ${outerGap}`}
+          />
+        </svg>
+      </div>
+
+      {/* Top-right inner: gold, counter-clockwise — starts mirrored */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -top-[115px] -right-[115px] z-0"
+        style={{
+          width: 560,
+          height: 560,
+          animation: 'arc-drift-reverse 70s linear infinite',
+        }}
+      >
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle
+            cx="50"
+            cy="50"
+            r="36"
+            fill="none"
+            stroke="#F0C555"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeDasharray={`${innerVisible} ${innerGap}`}
+            transform="rotate(180 50 50)"
+          />
+        </svg>
+      </div>
+
+      {/* Bottom-left outer: gold, counter-clockwise */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -bottom-[115px] -left-[115px] z-0"
+        style={{
+          width: 500,
+          height: 500,
+          animation: 'arc-drift-reverse 90s linear infinite',
+        }}
+      >
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="#F0C555"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeDasharray={`${outerVisible} ${outerGap}`}
+          />
+        </svg>
+      </div>
+
+      {/* Bottom-left inner: teal, clockwise — starts mirrored */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -bottom-[115px] -left-[115px] z-0"
+        style={{
+          width: 500,
+          height: 500,
+          animation: 'arc-drift 80s linear infinite',
+        }}
+      >
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle
+            cx="50"
+            cy="50"
+            r="36"
+            fill="none"
+            stroke="#33D3C9"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeDasharray={`${innerVisible} ${innerGap}`}
+            transform="rotate(180 50 50)"
+          />
+        </svg>
+      </div>
+    </>
+  );
+}
+
 export function Orb({
   size = 360,
   className = '',

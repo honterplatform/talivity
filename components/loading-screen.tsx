@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopNav } from '@/components/chrome';
+import { TopNav, DecorArcs } from '@/components/chrome';
 import { IconCheck } from '@/components/icons';
 
 interface Step {
@@ -121,6 +121,7 @@ export default function LoadingScreen({
       className="screen-enter min-h-screen relative overflow-hidden flex flex-col"
       style={{ background: 'var(--paper)', color: 'var(--ink)' }}
     >
+      <DecorArcs />
       <TopNav tone="paper" />
 
       <div className="flex-1 flex items-center justify-center px-8">

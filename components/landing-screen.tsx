@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { INDUSTRIES } from '@/lib/query-templates';
-import { TopNav, FooterBar } from '@/components/chrome';
+import { Wordmark, FooterBar, DecorArcs } from '@/components/chrome';
 import {
   IconAlert,
   IconArrowRight,
@@ -63,10 +64,17 @@ export default function LandingScreen() {
       className="screen-enter min-h-screen relative overflow-hidden flex flex-col"
       style={{ background: 'var(--paper)', color: 'var(--ink)' }}
     >
-      <TopNav tone="paper" />
+      <DecorArcs />
+      <div className="flex-1 flex items-center px-6 relative z-[1]">
+        <div className="max-w-[520px] mx-auto w-full">
+          <Link href="/" className="inline-flex items-center">
+            <Wordmark />
+          </Link>
+        </div>
+      </div>
 
-      <div className="flex-1 flex items-center justify-center px-6 py-12 md:py-16 relative z-[1]">
-        <div className="w-full max-w-[520px]">
+      <div className="px-6 relative z-[1]">
+        <div className="w-full max-w-[520px] mx-auto">
           <form noValidate onSubmit={submit} className="relative" style={{ color: 'var(--ink)' }}>
             <div className="eyebrow" style={{ color: '#1D837E', fontWeight: 700 }}>
               Start your audit
@@ -178,6 +186,8 @@ export default function LandingScreen() {
           </form>
         </div>
       </div>
+
+      <div className="flex-1" />
 
       <FooterBar tone="paper" />
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TopNav, FooterBar, Orb } from '@/components/chrome';
+import { TopNav, FooterBar, Orb, DecorArcs } from '@/components/chrome';
 import {
   IconAlert,
   IconArrowRight,
@@ -86,9 +86,10 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
   if (audit.notRecognized) {
     return (
       <div
-        className="screen-enter min-h-screen flex flex-col"
+        className="screen-enter min-h-screen flex flex-col relative overflow-hidden"
         style={{ background: 'var(--paper)', color: 'var(--ink)' }}
       >
+        <DecorArcs />
         <TopNav tone="paper" />
         <div className="flex-1 flex items-center justify-center px-8">
           <div className="max-w-[560px] text-center">
@@ -152,6 +153,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
 
   return (
     <div className="screen-enter min-h-screen" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
+      <DecorArcs />
       <div className="paper-grad">
         <TopNav tone="paper" />
         <div className="px-8 md:px-14 pt-4 md:pt-8 pb-12 md:pb-20">

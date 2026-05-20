@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TopNav, FooterBar } from '@/components/chrome';
+import { TopNav, FooterBar, DecorArcs } from '@/components/chrome';
 import {
   IconArrowRight,
   IconArrowUpRight,
@@ -20,9 +20,10 @@ export default function ConfirmationScreen({
 
   return (
     <div
-      className="screen-enter min-h-screen flex flex-col"
+      className="screen-enter min-h-screen flex flex-col relative overflow-hidden"
       style={{ background: 'var(--paper)', color: 'var(--ink)' }}
     >
+      <DecorArcs />
       <TopNav tone="paper" />
 
       <div className="flex-1 flex items-center justify-center px-8">
