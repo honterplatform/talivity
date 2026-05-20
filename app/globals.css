@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0E1714;
+  --ink-soft: #18221E;
+  --title: #03444A;
+  --ink-line: rgba(241, 238, 231, 0.10);
+  --paper: #EFFBFB;
+  --paper-warm: #FAFEFE;
+  --paper-line: rgba(14, 23, 20, 0.10);
+  --accent: #1F5E54;
+  --accent-soft: #6FA39A;
+  --peach: #F0D5B5;
+  --sage: #C8D5BC;
+  --clay: #E5C6AC;
+  --lilac: #D5CCE2;
+  --radius: 0.5rem;
+
+  --background: 40 24% 93%;
+  --foreground: 158 26% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 158 26% 7%;
+  --primary: 173 49% 25%;
+  --primary-foreground: 40 24% 96%;
+  --secondary: 40 24% 93%;
+  --secondary-foreground: 158 26% 7%;
+  --muted: 40 24% 93%;
+  --muted-foreground: 158 14% 35%;
+  --accent-hsl: 173 49% 25%;
+  --accent-foreground: 40 24% 96%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 40 24% 96%;
+  --border: 14 23 20 / 0.10;
+  --input: 14 23 20 / 0.10;
+  --ring: 158 26% 7%;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01' 1, 'ss02' 1;
+  overflow-x: hidden;
+}
+
+.serif {
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--title);
+}
+.serif em,
+.serif em.italic,
+.serif.italic {
+  font-style: normal;
+  font-weight: 700;
+}
+.display-tight {
+  letter-spacing: -0.035em;
+}
+.mono {
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+.eyebrow {
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 500;
+}
+.num {
+  font-feature-settings: 'tnum' 1, 'ss01' 1;
+}
+.accent-text {
+  color: var(--accent);
+}
+
+.arc {
+  position: relative;
+  border-radius: 9999px;
+  border: 14px solid var(--accent);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  transform: rotate(45deg);
+}
+.arc-thin {
+  border-width: 8px;
+}
+.orb,
+.orb-soft {
+  display: none;
+}
+body[data-hide-decor] .decor {
+  display: none !important;
+}
+.orb-pulse {
+  animation: arc-pulse 3.6s ease-in-out infinite;
+}
+@keyframes arc-pulse {
+  0%,
+  100% {
+    transform: rotate(45deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: rotate(45deg) scale(1.04);
+    opacity: 0.82;
+  }
+}
+
+.ink-circle {
+  border-radius: 9999px;
+  border: 1.5px solid var(--ink);
+  transform: rotate(-6deg);
+}
+
+.input {
+  width: 100%;
+  background: var(--paper-warm);
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 15px;
+  color: var(--ink);
+  transition: border-color 0.15s, background 0.15s;
+  font-family: 'Manrope', sans-serif;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: #fff;
+}
+.input::placeholder {
+  color: rgba(14, 23, 20, 0.4);
+}
+
+.btn-accent {
+  background: #1D837E;
+  color: var(--paper-warm);
+  border-radius: 8px;
+  padding: 16px 22px;
+  font-weight: 500;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.12s ease, background 0.15s, box-shadow 0.15s;
+}
+.btn-accent:hover {
+  background: #166663;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -12px rgba(29, 131, 126, 0.45);
+}
+.btn-accent:active {
+  transform: translateY(0);
+}
+.btn-accent:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-ink {
+  background: var(--ink);
+  color: var(--paper-warm);
+  border-radius: 10px;
+  padding: 14px 20px;
+  font-weight: 500;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-ink:hover {
+  background: #000;
+}
+
+.btn-ghost {
+  color: var(--ink);
+  border: 1px solid var(--paper-line);
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-weight: 500;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-ghost:hover {
+  border-color: var(--ink);
+}
+
+.scale-track {
+  background: var(--paper-warm);
+  border: 1px solid var(--paper-line);
+  border-radius: 999px;
+  height: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.scale-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--ink);
+  border-radius: 999px;
+}
+.scale-marker {
+  position: absolute;
+  top: -3px;
+  height: 20px;
+  width: 2px;
+  background: var(--ink);
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+.seg {
+  height: 56px;
+}
+.seg:first-child {
+  border-radius: 14px 0 0 14px;
+}
+.seg:last-child {
+  border-radius: 0 14px 14px 0;
+}
+
+.screen-enter {
+  animation: screen-fade 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes screen-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.progress-track {
+  height: 2px;
+  background: rgba(243, 239, 231, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.35s ease;
+}
+
+.dot-divider {
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1.5px);
+  background-size: 8px 8px;
+  background-repeat: repeat-x;
+  height: 2px;
+  opacity: 0.35;
+}
+
+.blink::after {
+  content: '▍';
+  margin-left: 2px;
+  animation: blink 1.05s steps(1) infinite;
+  color: var(--accent);
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.paper-grad {
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--paper) 60%);
+}
+
+.card-hover {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--paper-warm);
+  border: 1px solid var(--paper-line);
+  font-size: 11px;
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.pill-dark {
+  background: rgba(243, 239, 231, 0.06);
+  border-color: rgba(243, 239, 231, 0.14);
+  color: var(--paper);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper-warm);
+}
+
+@keyframes arc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.arc-spin {
+  animation: arc-spin 2.4s linear infinite;
+}
