@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TopNav, FooterBar, Orb, DecorArcs } from '@/components/chrome';
+import { TopNav, FooterBar, Orb } from '@/components/chrome';
 import {
   IconAlert,
   IconArrowRight,
@@ -54,18 +54,18 @@ function buildSourceMixSegments(
   competitorCitations: number
 ): MixSegment[] {
   const groups: Array<{ key: string; label: string; count: number; color: string; isOwn: boolean }> = [
-    { key: 'glassdoor', label: 'Glassdoor', count: sourceMix.glassdoor ?? 0, color: 'var(--peach)', isOwn: false },
-    { key: 'reddit', label: 'Reddit', count: sourceMix.reddit ?? 0, color: 'var(--clay)', isOwn: false },
-    { key: 'indeed', label: 'Indeed', count: sourceMix.indeed ?? 0, color: 'var(--sage)', isOwn: false },
-    { key: 'competitor', label: 'Competitors', count: competitorCitations, color: 'var(--lilac)', isOwn: false },
+    { key: 'glassdoor', label: 'Glassdoor', count: sourceMix.glassdoor ?? 0, color: 'rgba(240, 197, 85, 0.85)', isOwn: false },
+    { key: 'reddit', label: 'Reddit', count: sourceMix.reddit ?? 0, color: 'rgba(240, 197, 85, 0.55)', isOwn: false },
+    { key: 'indeed', label: 'Indeed', count: sourceMix.indeed ?? 0, color: 'rgba(51, 211, 201, 0.35)', isOwn: false },
+    { key: 'competitor', label: 'Competitors', count: competitorCitations, color: 'rgba(240, 197, 85, 0.35)', isOwn: false },
     {
       key: 'news',
       label: 'News / Press',
       count: (sourceMix.news ?? 0) + (sourceMix.wikipedia ?? 0) + (sourceMix.linkedin ?? 0) + (sourceMix.other ?? 0),
-      color: '#C8BFA6',
+      color: 'rgba(51, 211, 201, 0.55)',
       isOwn: false,
     },
-    { key: 'site', label: 'Your career site', count: sourceMix.ownSite ?? 0, color: 'var(--accent)', isOwn: true },
+    { key: 'site', label: 'Your career site', count: sourceMix.ownSite ?? 0, color: '#33D3C9', isOwn: true },
   ];
 
   const total = groups.reduce((s, g) => s + g.count, 0);
@@ -86,21 +86,20 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
   if (audit.notRecognized) {
     return (
       <div
-        className="screen-enter min-h-screen flex flex-col relative overflow-hidden"
+        className="screen-enter min-h-screen flex flex-col"
         style={{ background: 'var(--paper)', color: 'var(--ink)' }}
       >
-        <DecorArcs />
         <TopNav tone="paper" />
         <div className="flex-1 flex items-center justify-center px-8">
           <div className="max-w-[560px] text-center">
-            <div className="eyebrow" style={{ color: 'var(--accent)' }}>
+            <div className="eyebrow" style={{ color: '#33D3C9' }}>
               Not enough signal
             </div>
             <h1
               className="serif mt-4"
               style={{ fontSize: 'clamp(40px, 5.4vw, 72px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
             >
-              We couldn't find <em className="italic" style={{ color: 'var(--accent)' }}>{audit.companyName}</em> in the conversation.
+              We couldn't find <em className="italic" style={{ color: '#33D3C9' }}>{audit.companyName}</em> in the conversation.
             </h1>
             <p className="mt-5 text-[17px] opacity-75 leading-relaxed">
               {audit.errorMessage ??
@@ -153,10 +152,9 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
 
   return (
     <div className="screen-enter min-h-screen" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
-      <DecorArcs />
       <div className="paper-grad">
         <TopNav tone="paper" />
-        <div className="px-8 md:px-14 pt-4 md:pt-8 pb-12 md:pb-20">
+        <div className="px-10 md:px-20 pt-4 md:pt-8 pb-12 md:pb-20">
           <div className="flex items-center gap-3 text-[12px] mono uppercase tracking-wider opacity-70">
             <span>AI Visibility Audit for</span>
             <span style={{ width: 22, height: 1, background: 'var(--ink)', opacity: 0.4 }} />
@@ -180,7 +178,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
         </div>
       </div>
 
-      <div className="px-8 md:px-14 -mt-2">
+      <div className="px-10 md:px-20 -mt-2">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
           <div className="lg:col-span-5">
             <div className="eyebrow opacity-70 flex items-center gap-3">
@@ -228,11 +226,11 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
             <div className="mt-9 flex items-start gap-3 max-w-[480px]">
               <div
                 className="mt-1.5 shrink-0"
-                style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: 99 }}
+                style={{ width: 8, height: 8, background: '#33D3C9', borderRadius: 99 }}
               />
               <p
                 className="serif italic text-[22px] md:text-[26px] leading-snug"
-                style={{ color: 'var(--accent)' }}
+                style={{ color: '#33D3C9' }}
               >
                 You're invisible in {invisibilityRatio} candidate searches.
               </p>
@@ -278,12 +276,12 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
         </div>
       </div>
 
-      <div className="px-8 md:px-14 mt-20">
+      <div className="px-10 md:px-20 mt-20">
         <div className="dot-divider" style={{ color: 'var(--ink)' }} />
       </div>
 
       {/* Source mix */}
-      <section className="px-8 md:px-14 mt-16">
+      <section className="px-10 md:px-20 mt-16">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           <div className="lg:col-span-4">
             <div className="eyebrow opacity-70">02 · The pipeline</div>
@@ -292,7 +290,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
             >
               Where candidates are getting their{' '}
-              <em className="italic" style={{ color: 'var(--accent)' }}>
+              <em className="italic" style={{ color: '#33D3C9' }}>
                 information
               </em>
               .
@@ -342,7 +340,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
                   width: 36,
                   height: 36,
                   borderRadius: 10,
-                  background: 'var(--accent)',
+                  background: '#33D3C9',
                   color: 'var(--paper-warm)',
                   display: 'flex',
                   alignItems: 'center',
@@ -364,12 +362,12 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
         </div>
       </section>
 
-      <div className="px-8 md:px-14 mt-20">
+      <div className="px-10 md:px-20 mt-20">
         <div className="dot-divider" style={{ color: 'var(--ink)' }} />
       </div>
 
       {/* What AI is saying */}
-      <section className="px-8 md:px-14 mt-16">
+      <section className="px-10 md:px-20 mt-16">
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
             <div className="eyebrow opacity-70">03 · Verbatim</div>
@@ -378,7 +376,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
             >
               What AI is{' '}
-              <em className="italic" style={{ color: 'var(--accent)' }}>
+              <em className="italic" style={{ color: '#33D3C9' }}>
                 actually
               </em>{' '}
               saying.
@@ -396,12 +394,12 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
         </div>
       </section>
 
-      <div className="px-8 md:px-14 mt-20">
+      <div className="px-10 md:px-20 mt-20">
         <div className="dot-divider" style={{ color: 'var(--ink)' }} />
       </div>
 
       {/* What this means */}
-      <section className="px-8 md:px-14 mt-16">
+      <section className="px-10 md:px-20 mt-16">
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
             <div className="eyebrow opacity-70">04 · So what</div>
@@ -410,7 +408,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
             >
               What this means for your{' '}
-              <em className="italic" style={{ color: 'var(--accent)' }}>
+              <em className="italic" style={{ color: '#33D3C9' }}>
                 hiring
               </em>
               .
@@ -473,9 +471,9 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
           />
         </div>
 
-        <div className="px-8 md:px-14 py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-[1]">
+        <div className="px-10 md:px-20 py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-[1]">
           <div className="lg:col-span-7">
-            <div className="eyebrow" style={{ color: 'var(--accent)' }}>
+            <div className="eyebrow" style={{ color: '#33D3C9' }}>
               Next step
             </div>
             <h2
@@ -483,7 +481,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               style={{ fontSize: 'clamp(44px, 6vw, 84px)', lineHeight: 0.98, letterSpacing: '-0.02em' }}
             >
               Want the{' '}
-              <em className="italic" style={{ color: 'var(--accent)' }}>
+              <em className="italic" style={{ color: '#33D3C9' }}>
                 full diagnostic
               </em>
               ?
@@ -538,7 +536,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
                   <li key={h} className="flex gap-3">
                     <span
                       className="mt-1.5 shrink-0"
-                      style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: 99 }}
+                      style={{ width: 8, height: 8, background: '#33D3C9', borderRadius: 99 }}
                     />
                     <div>
                       <div className="font-medium">{h}</div>
@@ -585,12 +583,12 @@ function ResultStat({
 }) {
   const bg =
     tone === 'lilac'
-      ? 'var(--lilac)'
+      ? 'rgba(51, 211, 201, 0.25)'
       : tone === 'peach'
-        ? 'var(--peach)'
+        ? 'rgba(240, 197, 85, 0.30)'
         : tone === 'sage'
-          ? 'var(--sage)'
-          : 'var(--clay)';
+          ? 'rgba(51, 211, 201, 0.15)'
+          : 'rgba(240, 197, 85, 0.20)';
   return (
     <div className="rounded-[18px] p-6 flex flex-col h-full card-hover" style={{ background: bg }}>
       <div className="serif num" style={{ fontSize: 88, lineHeight: 0.88, letterSpacing: '-0.03em' }}>
@@ -622,7 +620,7 @@ function ResponseCard({
       <div className="mt-5 pl-4 relative">
         <span
           className="absolute left-0 top-1 bottom-1 w-[2px]"
-          style={{ background: 'var(--accent)' }}
+          style={{ background: '#33D3C9' }}
         />
         <p className="serif italic text-[16px] leading-[1.55]" style={{ color: 'var(--ink)' }}>
           “{r.response}”

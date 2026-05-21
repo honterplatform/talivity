@@ -31,9 +31,7 @@ export function TopNav({ tone = 'paper' }: { tone?: Tone }) {
 export function FooterBar({ tone = 'paper' }: { tone?: Tone }) {
   const dark = tone === 'ink';
   return (
-    <footer
-      className={`px-8 md:px-14 py-10 mt-16 ${dark ? 'border-t border-white/10' : 'border-t border-black/10'}`}
-    >
+    <footer className="px-8 md:px-14 py-10 mt-16">
       <div
         className={`flex flex-col items-center gap-3 md:flex-row md:justify-center md:gap-10 text-[12px] ${
           dark ? 'text-white/60' : 'text-black/60'
