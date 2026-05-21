@@ -48,18 +48,36 @@ const NEWS_OUTLETS = [
   'ft.com',
 ];
 
-const OWN_SITE_PATTERNS = (company: string): RegExp[] => {
+const OWN_SITE_PATTERNS = (company: string, companyUrl?: string | null): RegExp[] => {
+  const patterns: RegExp[] = [];
   const slug = company.toLowerCase().replace(/[^a-z0-9]/g, '');
   const looseSlug = company.toLowerCase().replace(/[^a-z0-9]/g, '.?');
-  return [
+
+  // If we have a real URL, derive precise patterns from its hostname.
+  if (companyUrl) {
+    try {
+      const u = new URL(companyUrl.startsWith('http') ? companyUrl : `https://${companyUrl}`);
+      const host = u.hostname.replace(/^www\./i, '');
+      const escapedHost = host.replace(/[.]/g, '\\.');
+      patterns.push(new RegExp(`\\b(?:[a-z0-9-]+\\.)?${escapedHost}\\b`, 'i'));
+      patterns.push(new RegExp(`${escapedHost}/(?:careers?|jobs?|hiring|talent|work|about)`, 'i'));
+    } catch {
+      // fall through to name-based fallback
+    }
+  }
+
+  // Name-based fallback patterns
+  patterns.push(
     new RegExp(`careers?\\.${looseSlug}\\.com`, 'i'),
     new RegExp(`jobs?\\.${looseSlug}\\.com`, 'i'),
     new RegExp(`${looseSlug}\\.com/careers?`, 'i'),
     new RegExp(`${looseSlug}\\.com/jobs?`, 'i'),
     new RegExp(`\\b${slug}\\b.{0,40}(career|careers|website|own site|company site|hiring page|jobs page)`, 'i'),
     new RegExp(`(their|its|the company's)\\s+(career site|careers page|website|hiring page|jobs page)`, 'i'),
-    new RegExp(`(according to|based on)\\s+${slug}'s?\\s+(own|website|site|career|careers|materials|communications)`, 'i'),
-  ];
+    new RegExp(`(according to|based on)\\s+${slug}'s?\\s+(own|website|site|career|careers|materials|communications)`, 'i')
+  );
+
+  return patterns;
 };
 
 const NOT_RECOGNIZED_PATTERNS: RegExp[] = [
@@ -97,7 +115,8 @@ function countMatches(text: string, needles: string[]): number {
 export function parseResponseCitations(
   response: string,
   company: string,
-  industry: Industry
+  industry: Industry,
+  companyUrl?: string | null
 ): ParsedCitations {
   const lower = response.toLowerCase();
   const sourceMix: Record<SourceKey, number> = {
@@ -112,7 +131,7 @@ export function parseResponseCitations(
   };
 
   // Own site detection
-  const ownSitePatterns = OWN_SITE_PATTERNS(company);
+  const ownSitePatterns = OWN_SITE_PATTERNS(company, companyUrl);
   const ownSiteHit = ownSitePatterns.some((re) => re.test(response));
   if (ownSiteHit) sourceMix.ownSite += 1;
 

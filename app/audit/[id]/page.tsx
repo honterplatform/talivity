@@ -63,11 +63,14 @@ export default async function AuditPage({ params }: { params: { id: string } }) 
   const vm: AuditViewModel = {
     id: String(audit._id),
     companyName: audit.companyName,
+    companyUrl: audit.companyUrl ?? null,
     industry: audit.industry,
     email: audit.email,
     score: audit.score ?? 0,
     citationsOwned: audit.citationsOwned ?? 0,
     citationsTotal: audit.citationsTotal ?? 0,
+    totalResponses: (audit as { totalResponses?: number }).totalResponses ?? undefined,
+    platformsUsed: (audit as { platformsUsed?: number }).platformsUsed ?? undefined,
     sourceMix: (audit.sourceMix ?? {}) as Record<string, number>,
     sampleResponses: (audit.sampleResponses ?? []) as AuditViewModel['sampleResponses'],
     competitors: {

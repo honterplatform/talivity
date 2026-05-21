@@ -54,7 +54,14 @@ export function FooterBar({ tone = 'paper' }: { tone?: Tone }) {
   );
 }
 
-export function DecorArcs() {
+export function DecorArcs({
+  position = 'fixed',
+  corners = 'both',
+}: {
+  position?: 'fixed' | 'absolute';
+  corners?: 'both' | 'top-right' | 'bottom-left';
+} = {}) {
+  const pos = position === 'absolute' ? 'absolute' : 'fixed';
   const Couter = 2 * Math.PI * 44;
   const outerVisible = Couter * 0.65;
   const outerGap = Couter - outerVisible;
@@ -63,12 +70,16 @@ export function DecorArcs() {
   const innerVisible = Cinner * 0.4;
   const innerGap = Cinner - innerVisible;
 
+  const showTopRight = corners === 'both' || corners === 'top-right';
+  const showBottomLeft = corners === 'both' || corners === 'bottom-left';
+
   return (
     <>
+      {showTopRight && (<>
       {/* Top-right outer: teal, clockwise */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed -top-[115px] -right-[115px] z-0"
+        className={`pointer-events-none ${pos} -top-[115px] -right-[115px] z-0`}
         style={{
           width: 560,
           height: 560,
@@ -92,7 +103,7 @@ export function DecorArcs() {
       {/* Top-right inner: gold, counter-clockwise — starts mirrored */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed -top-[115px] -right-[115px] z-0"
+        className={`pointer-events-none ${pos} -top-[115px] -right-[115px] z-0`}
         style={{
           width: 560,
           height: 560,
@@ -114,10 +125,12 @@ export function DecorArcs() {
         </svg>
       </div>
 
+      </>)}
+      {showBottomLeft && (<>
       {/* Bottom-left outer: gold, counter-clockwise */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed -bottom-[115px] -left-[115px] z-0"
+        className={`pointer-events-none ${pos} -bottom-[115px] -left-[115px] z-0`}
         style={{
           width: 500,
           height: 500,
@@ -141,7 +154,7 @@ export function DecorArcs() {
       {/* Bottom-left inner: teal, clockwise — starts mirrored */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed -bottom-[115px] -left-[115px] z-0"
+        className={`pointer-events-none ${pos} -bottom-[115px] -left-[115px] z-0`}
         style={{
           width: 500,
           height: 500,
@@ -162,6 +175,7 @@ export function DecorArcs() {
           />
         </svg>
       </div>
+      </>)}
     </>
   );
 }

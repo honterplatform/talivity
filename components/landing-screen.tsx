@@ -15,14 +15,17 @@ import LoadingScreen from '@/components/loading-screen';
 
 export default function LandingScreen() {
   const router = useRouter();
-  const [company, setCompany] = useState('Northwind Health Systems');
+  const [companyUrl, setCompanyUrl] = useState('');
   const [industry, setIndustry] = useState<string>('Healthcare');
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = company.trim().length >= 2 && industry && /.+@.+\..+/.test(email);
+  const urlValid = /^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(companyUrl.trim());
+  const valid = industry && urlValid && /.+@.+\..+/.test(email);
+
+  const loadingCompanyHint = companyUrl.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0] || 'your company';
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +39,7 @@ export default function LandingScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyName: company.trim(),
+          companyUrl: companyUrl.trim(),
           industry,
           email: email.trim(),
         }),
@@ -56,7 +59,7 @@ export default function LandingScreen() {
   }
 
   if (submitting) {
-    return <LoadingScreen company={company.trim()} />;
+    return <LoadingScreen company={loadingCompanyHint} />;
   }
 
   return (
@@ -93,14 +96,25 @@ export default function LandingScreen() {
             <div className="mt-7 space-y-3">
               <label className="block">
                 <span className="text-[12px] mono uppercase tracking-wider opacity-60">
-                  Company
+                  Company website
                 </span>
                 <input
                   className="input mt-1"
-                  placeholder="Northwind Health Systems"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
+                  placeholder="yourcompany.com"
+                  value={companyUrl}
+                  onChange={(e) => setCompanyUrl(e.target.value)}
                 />
+                {touched && !urlValid && (
+                  <span
+                    className="text-[12px] mt-1 inline-flex items-center gap-1.5"
+                    style={{ color: '#1D837E' }}
+                  >
+                    <IconAlert size={12} /> Enter a valid URL (e.g. acme.com)
+                  </span>
+                )}
               </label>
 
               <label className="block">
@@ -131,7 +145,9 @@ export default function LandingScreen() {
                 </span>
                 <input
                   className="input mt-1"
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="email"
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

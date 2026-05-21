@@ -126,39 +126,45 @@ export default function LoadingScreen({
 
       <div className="flex-1 flex items-center justify-center px-8">
         <div className="relative w-full max-w-[860px] text-center">
-          <div className="relative mx-auto" style={{ width: 240, height: 240 }}>
+          <div className="relative mx-auto" style={{ width: 200, height: 200 }}>
+            {/* Outer teal arc, clockwise */}
             <div
-              className="absolute inset-0 arc-spin"
-              style={{
-                borderRadius: 9999,
-                border: '10px solid var(--accent)',
-                borderTopColor: 'transparent',
-                borderLeftColor: 'transparent',
-              }}
-            />
-            <div
-              className="absolute"
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: 99,
-                background: 'var(--accent)',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-              }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className="rounded-full border"
-                style={{ width: 320, height: 320, borderColor: 'rgba(14,23,20,0.10)' }}
-              />
+              className="absolute inset-0"
+              style={{ animation: 'arc-drift 5s linear infinite' }}
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 100 100" width="100%" height="100%">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  fill="none"
+                  stroke="#33D3C9"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 44 * 0.65} ${2 * Math.PI * 44 * 0.35}`}
+                />
+              </svg>
             </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className="rounded-full border"
-                style={{ width: 420, height: 420, borderColor: 'rgba(14,23,20,0.06)' }}
-              />
+            {/* Inner gold arc, counter-clockwise */}
+            <div
+              className="absolute inset-0"
+              style={{ animation: 'arc-drift-reverse 7s linear infinite' }}
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 100 100" width="100%" height="100%">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="32"
+                  fill="none"
+                  stroke="#F0C555"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 32 * 0.4} ${2 * Math.PI * 32 * 0.6}`}
+                  transform="rotate(180 50 50)"
+                />
+              </svg>
             </div>
           </div>
 

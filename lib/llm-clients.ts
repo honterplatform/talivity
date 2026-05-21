@@ -11,7 +11,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 };
 
 const SYSTEM_PROMPT =
-  "You are an AI assistant helping a job candidate research employers. Answer based on what you know about the company. Cite specific sources when possible (e.g., 'According to Glassdoor reviews...', 'Indeed reports...', 'Based on news coverage...'). Be honest about employee sentiment.";
+  "You are an AI assistant helping a job candidate research employers. Only state facts you actually know about the specific company being asked about. If you do not have reliable information about this exact company, say so plainly (e.g. 'I don't have reliable information about this company') and stop — DO NOT invent benefits, programs, culture details, or any other specifics to fill space. When you do have information, cite specific sources by name (e.g., 'According to Glassdoor reviews...', 'Indeed reports...', 'Based on news coverage...'). Be honest about employee sentiment and about the limits of your knowledge.";
 
 const MAX_TOKENS = 300;
 const TEMPERATURE = 0.3;
@@ -75,7 +75,11 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function callOpenAI(query: string): Promise<LLMCallResult> {
+function buildUserMessage(query: string, context?: string): string {
+  return context ? `${context}\n\n${query}` : query;
+}
+
+export async function callOpenAI(query: string, context?: string): Promise<LLMCallResult> {
   try {
     const client = getOpenAI();
     const result = await withRetry('openai', () =>
@@ -85,7 +89,7 @@ export async function callOpenAI(query: string): Promise<LLMCallResult> {
         max_tokens: MAX_TOKENS,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: query },
+          { role: 'user', content: buildUserMessage(query, context) },
         ],
       })
     );
@@ -101,7 +105,7 @@ export async function callOpenAI(query: string): Promise<LLMCallResult> {
   }
 }
 
-export async function callAnthropic(query: string): Promise<LLMCallResult> {
+export async function callAnthropic(query: string, context?: string): Promise<LLMCallResult> {
   try {
     const client = getAnthropic();
     const result = await withRetry('anthropic', () =>
@@ -110,7 +114,7 @@ export async function callAnthropic(query: string): Promise<LLMCallResult> {
         max_tokens: MAX_TOKENS,
         temperature: TEMPERATURE,
         system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: query }],
+        messages: [{ role: 'user', content: buildUserMessage(query, context) }],
       })
     );
     const text = result.content
@@ -129,7 +133,7 @@ export async function callAnthropic(query: string): Promise<LLMCallResult> {
   }
 }
 
-export async function callGemini(query: string): Promise<LLMCallResult> {
+export async function callGemini(query: string, context?: string): Promise<LLMCallResult> {
   try {
     const client = getGemini();
     const model = client.getGenerativeModel({
@@ -137,7 +141,7 @@ export async function callGemini(query: string): Promise<LLMCallResult> {
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: { temperature: TEMPERATURE, maxOutputTokens: MAX_TOKENS },
     });
-    const result = await withRetry('gemini', () => model.generateContent(query));
+    const result = await withRetry('gemini', () => model.generateContent(buildUserMessage(query, context)));
     const text = result.response.text().trim();
     return { platform: 'gemini', query, response: text };
   } catch (err) {

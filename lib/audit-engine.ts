@@ -30,6 +30,8 @@ export interface AuditResult {
   score: number;
   citationsOwned: number;
   citationsTotal: number;
+  totalResponses: number;
+  platformsUsed: number;
   sourceMix: Record<SourceKey, number>;
   sampleResponses: SampleResponse[];
   competitors: {
@@ -43,13 +45,22 @@ export interface AuditResult {
   scoreBreakdown: ScoringOutput['breakdown'];
 }
 
-export async function runAudit(companyName: string, industry: Industry): Promise<AuditResult> {
+export async function runAudit(
+  companyName: string,
+  industry: Industry,
+  companyUrl: string
+): Promise<AuditResult> {
   const queries = generateQueries(companyName, industry);
+  const context = `Context: The company is ${companyName} (website: ${companyUrl}). Answer the following question about this specific company.`;
 
-  // Fire all 30 calls in parallel.
+  // Fire all calls in parallel — Gemini only included if its key is configured.
+  const useGemini = !!process.env.GOOGLE_AI_API_KEY;
+  const platformsUsed = useGemini ? 3 : 2;
+  const totalResponses = queries.length * platformsUsed;
   const callPromises: Promise<LLMCallResult>[] = [];
   for (const q of queries) {
-    callPromises.push(callOpenAI(q), callAnthropic(q), callGemini(q));
+    callPromises.push(callOpenAI(q, context), callAnthropic(q, context));
+    if (useGemini) callPromises.push(callGemini(q, context));
   }
   const allResults = await Promise.all(callPromises);
   const successful = allResults.filter((r) => !r.error && r.response.length > 0);
@@ -61,6 +72,8 @@ export async function runAudit(companyName: string, industry: Industry): Promise
       score: 0,
       citationsOwned: 0,
       citationsTotal: 0,
+      totalResponses,
+      platformsUsed,
       sourceMix: emptySourceMix(),
       sampleResponses: [],
       competitors: { topCompetitor: null, competitorCitations: 0, breakdown: {} },
@@ -79,7 +92,7 @@ export async function runAudit(companyName: string, industry: Industry): Promise
   // Parse each successful response.
   const parsed = successful.map((r) => ({
     result: r,
-    parsed: parseResponseCitations(r.response, companyName, industry),
+    parsed: parseResponseCitations(r.response, companyName, industry, companyUrl),
   }));
 
   const sourceMix = mergeSourceMixes(parsed.map((p) => p.parsed.sourceMix));
@@ -106,6 +119,8 @@ export async function runAudit(companyName: string, industry: Industry): Promise
     score: notRecognized ? 0 : scoring.score,
     citationsOwned: scoring.citationsOwned,
     citationsTotal: scoring.citationsTotal,
+    totalResponses,
+    platformsUsed,
     sourceMix,
     sampleResponses,
     competitors: {

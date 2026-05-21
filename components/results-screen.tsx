@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TopNav, FooterBar, Orb } from '@/components/chrome';
+import { TopNav, FooterBar, DecorArcs } from '@/components/chrome';
 import {
   IconAlert,
   IconArrowRight,
@@ -15,11 +15,14 @@ import {
 export interface AuditViewModel {
   id: string;
   companyName: string;
+  companyUrl?: string | null;
   industry: string;
   email: string;
   score: number;
   citationsOwned: number;
   citationsTotal: number;
+  totalResponses?: number;
+  platformsUsed?: number;
   sourceMix: Record<string, number>;
   sampleResponses: Array<{
     platform: string;
@@ -47,8 +50,6 @@ interface MixSegment {
   isOwn: boolean;
 }
 
-const TOTAL_RESPONSES = 30;
-
 function buildSourceMixSegments(
   sourceMix: Record<string, number>,
   competitorCitations: number
@@ -75,7 +76,7 @@ function buildSourceMixSegments(
   return groups.map((g) => ({ ...g, pct: Math.round((g.count / total) * 100) }));
 }
 
-function ratioOutOf(count: number, total = TOTAL_RESPONSES): string {
+function ratioOutOf(count: number, total: number): string {
   const capped = Math.min(count, total);
   return `${capped}/${total}`;
 }
@@ -127,20 +128,22 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
   const topCompetitor = audit.competitors.topCompetitor;
   const competitorCount = audit.competitors.competitorCitations;
   const glassdoorCount = audit.sourceMix.glassdoor ?? 0;
-  const invisibilityCount = Math.max(0, TOTAL_RESPONSES - audit.citationsOwned);
-  const invisibilityRatio = `${Math.round((invisibilityCount / TOTAL_RESPONSES) * 10)} out of 10`;
+  const totalResponses = audit.totalResponses ?? 30;
+  const platformsUsed = audit.platformsUsed ?? 3;
+  const invisibilityCount = Math.max(0, totalResponses - audit.citationsOwned);
+  const invisibilityRatio = `${Math.round((invisibilityCount / totalResponses) * 10)} out of 10`;
 
   const implications = [
     {
       icon: <IconEye size={20} />,
       head: "You're not in the conversation.",
-      body: `Out of ${TOTAL_RESPONSES} candidate queries, your company was the cited source in ${audit.citationsOwned}. That means candidates researching you with AI are forming opinions from third-party sources you don't control.`,
+      body: `Out of ${totalResponses} candidate queries, your company was the cited source in ${audit.citationsOwned}. That means candidates researching you with AI are forming opinions from third-party sources you don't control.`,
     },
     {
       icon: <IconUsers size={20} />,
       head: topCompetitor ? 'Competitors own your category.' : 'No clear competitor dominance — yet.',
       body: topCompetitor
-        ? `${topCompetitor} surfaces in ${competitorCount} of the ${TOTAL_RESPONSES} responses. They're not winning on benefits — they're winning on the inputs AI assistants actually read.`
+        ? `${topCompetitor} surfaces in ${competitorCount} of the ${totalResponses} responses. They're not winning on benefits — they're winning on the inputs AI assistants actually read.`
         : `No single competitor dominated the responses. That's a window: the category is still up for grabs, and the team that invests in AI-readable content first will define how candidates compare you.`,
     },
     {
@@ -151,10 +154,11 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
   ];
 
   return (
-    <div className="screen-enter min-h-screen" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
+    <div className="screen-enter min-h-screen relative overflow-x-hidden" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
+      <DecorArcs corners="top-right" position="absolute" />
       <div className="paper-grad">
         <TopNav tone="paper" />
-        <div className="px-10 md:px-20 pt-4 md:pt-8 pb-12 md:pb-20">
+        <div className="px-16 md:px-32 max-w-[1600px] mx-auto pt-6 md:pt-12 pb-16 md:pb-28">
           <div className="flex items-center gap-3 text-[12px] mono uppercase tracking-wider opacity-70">
             <span>AI Visibility Audit for</span>
             <span style={{ width: 22, height: 1, background: 'var(--ink)', opacity: 0.4 }} />
@@ -173,13 +177,21 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
             <span>·</span>
             <span>Audit ID {auditIdShort}</span>
             <span>·</span>
-            <span>30 candidate queries · 3 frontier models</span>
+            <span>{totalResponses} candidate queries · {platformsUsed} frontier models</span>
           </div>
         </div>
       </div>
 
-      <div className="px-10 md:px-20 -mt-2">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+      <div className="px-16 md:px-32 max-w-[1600px] mx-auto">
+        <div
+          className="rounded-[28px] p-8 md:p-14"
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid rgba(14,23,20,0.06)',
+            boxShadow: '0 20px 60px -32px rgba(14,23,20,0.12)',
+          }}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
           <div className="lg:col-span-5">
             <div className="eyebrow opacity-70 flex items-center gap-3">
               <span style={{ width: 22, height: 1, background: 'var(--ink)', opacity: 0.5 }} />
@@ -223,26 +235,14 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               </div>
             </div>
 
-            <div className="mt-9 flex items-start gap-3 max-w-[480px]">
-              <div
-                className="mt-1.5 shrink-0"
-                style={{ width: 8, height: 8, background: '#33D3C9', borderRadius: 99 }}
-              />
-              <p
-                className="serif italic text-[22px] md:text-[26px] leading-snug"
-                style={{ color: '#33D3C9' }}
-              >
-                You're invisible in {invisibilityRatio} candidate searches.
-              </p>
-            </div>
           </div>
 
           <div className="lg:col-span-7">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
               <ResultStat
                 tone="lilac"
-                big={ratioOutOf(audit.citationsOwned)}
-                label={`Times you were cited across ${TOTAL_RESPONSES} candidate queries`}
+                big={ratioOutOf(audit.citationsOwned, totalResponses)}
+                label={`Times you were cited across ${totalResponses} candidate queries`}
                 sub={
                   audit.citationsOwned > 0
                     ? `${audit.citationsOwned} response${audit.citationsOwned === 1 ? '' : 's'} pointed back at your own content. The rest didn't.`
@@ -251,7 +251,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               />
               <ResultStat
                 tone="peach"
-                big={ratioOutOf(competitorCount)}
+                big={ratioOutOf(competitorCount, totalResponses)}
                 label={
                   topCompetitor
                     ? `Times ${topCompetitor} was cited`
@@ -267,24 +267,38 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               />
               <ResultStat
                 tone="sage"
-                big={ratioOutOf(glassdoorCount)}
+                big={ratioOutOf(glassdoorCount, totalResponses)}
                 label="Times Glassdoor was cited instead of you"
                 sub="Your reviews are doing your recruiting."
               />
             </div>
+
+            <div className="mt-6 md:mt-8 flex items-start gap-3">
+              <div
+                className="mt-1.5 shrink-0"
+                style={{ width: 7, height: 7, background: '#33D3C9', borderRadius: 99 }}
+              />
+              <p
+                className="serif italic text-[16px] md:text-[18px] leading-snug"
+                style={{ color: '#33D3C9' }}
+              >
+                You're invisible in {invisibilityRatio} candidate searches.
+              </p>
+            </div>
+          </div>
           </div>
         </div>
       </div>
 
-      <div className="px-10 md:px-20 mt-20">
+      <div className="px-16 md:px-32 max-w-[1600px] mx-auto mt-24">
         <div className="dot-divider" style={{ color: 'var(--ink)' }} />
       </div>
 
       {/* Source mix */}
-      <section className="px-10 md:px-20 mt-16">
+      <section className="px-16 md:px-32 max-w-[1600px] mx-auto mt-24">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           <div className="lg:col-span-4">
-            <div className="eyebrow opacity-70">02 · The pipeline</div>
+            <div className="eyebrow" style={{ color: '#03444A', fontWeight: 700 }}>02 · The pipeline</div>
             <h2
               className="serif mt-3"
               style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
@@ -362,47 +376,53 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
         </div>
       </section>
 
-      <div className="px-10 md:px-20 mt-20">
+      <div className="px-16 md:px-32 max-w-[1600px] mx-auto mt-24">
         <div className="dot-divider" style={{ color: 'var(--ink)' }} />
       </div>
 
       {/* What AI is saying */}
-      <section className="px-10 md:px-20 mt-16">
-        <div className="flex items-end justify-between flex-wrap gap-4">
-          <div>
-            <div className="eyebrow opacity-70">03 · Verbatim</div>
-            <h2
-              className="serif mt-3"
-              style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
-            >
-              What AI is{' '}
-              <em className="italic" style={{ color: '#33D3C9' }}>
-                actually
-              </em>{' '}
-              saying.
-            </h2>
-          </div>
-          <div className="text-[13px] opacity-70 max-w-[420px]">
+      <section className="px-16 md:px-32 max-w-[1600px] mx-auto mt-24">
+        <div>
+          <div className="eyebrow" style={{ color: '#03444A', fontWeight: 700 }}>03 · Verbatim</div>
+          <h2
+            className="serif mt-3"
+            style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
+          >
+            What AI is{' '}
+            <em className="italic" style={{ color: '#33D3C9' }}>
+              actually
+            </em>{' '}
+            saying.
+          </h2>
+          <p className="mt-5 text-[15px] leading-relaxed opacity-75 max-w-[560px]">
             Raw model responses, captured during this audit. Light cleanup for length only.
-          </div>
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-10">
+        <div
+          className={`grid grid-cols-1 gap-5 mt-10 ${
+            audit.sampleResponses.length >= 3
+              ? 'md:grid-cols-3'
+              : audit.sampleResponses.length === 2
+                ? 'md:grid-cols-2'
+                : 'md:grid-cols-1'
+          }`}
+        >
           {audit.sampleResponses.map((r, i) => (
             <ResponseCard key={`${r.platform}-${i}`} r={r} />
           ))}
         </div>
       </section>
 
-      <div className="px-10 md:px-20 mt-20">
+      <div className="px-16 md:px-32 max-w-[1600px] mx-auto mt-24">
         <div className="dot-divider" style={{ color: 'var(--ink)' }} />
       </div>
 
       {/* What this means */}
-      <section className="px-10 md:px-20 mt-16">
+      <section className="px-16 md:px-32 max-w-[1600px] mx-auto mt-24">
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
-            <div className="eyebrow opacity-70">04 · So what</div>
+            <div className="eyebrow" style={{ color: '#03444A', fontWeight: 700 }}>04 · So what</div>
             <h2
               className="serif mt-3"
               style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
@@ -454,24 +474,16 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
 
       {/* CTA band */}
       <section
-        className="mt-24 relative overflow-hidden"
+        className="mt-48 relative overflow-hidden"
         style={{
           background: 'var(--paper-warm)',
           color: 'var(--ink)',
           borderTop: '1px solid var(--paper-line)',
         }}
       >
-        <div className="absolute -top-32 -right-32 pointer-events-none">
-          <Orb size={520} />
-        </div>
-        <div className="absolute bottom-12 left-[44%] pointer-events-none hidden md:block">
-          <div
-            className="ink-circle"
-            style={{ width: 22, height: 22, borderColor: 'rgba(14,23,20,0.45)' }}
-          />
-        </div>
+        <DecorArcs corners="bottom-left" position="absolute" />
 
-        <div className="px-10 md:px-20 py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-[1]">
+        <div className="px-16 md:px-32 max-w-[1600px] mx-auto py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-[1]">
           <div className="lg:col-span-7">
             <div className="eyebrow" style={{ color: '#33D3C9' }}>
               Next step
@@ -591,7 +603,14 @@ function ResultStat({
           : 'rgba(240, 197, 85, 0.20)';
   return (
     <div className="rounded-[18px] p-6 flex flex-col h-full card-hover" style={{ background: bg }}>
-      <div className="serif num" style={{ fontSize: 88, lineHeight: 0.88, letterSpacing: '-0.03em' }}>
+      <div
+        className="serif num"
+        style={{
+          fontSize: 'clamp(40px, 4vw, 56px)',
+          lineHeight: 0.95,
+          letterSpacing: '-0.03em',
+        }}
+      >
         {big}
       </div>
       <div className="mt-5 text-[15px] font-medium leading-snug">{label}</div>
