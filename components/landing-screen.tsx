@@ -3,27 +3,20 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { INDUSTRIES } from '@/lib/query-templates';
 import { Wordmark, FooterBar, DecorArcs } from '@/components/chrome';
-import {
-  IconAlert,
-  IconArrowRight,
-  IconCheck,
-  IconChevron,
-} from '@/components/icons';
+import { IconAlert, IconArrowRight, IconCheck } from '@/components/icons';
 import LoadingScreen from '@/components/loading-screen';
 
 export default function LandingScreen() {
   const router = useRouter();
   const [companyUrl, setCompanyUrl] = useState('');
-  const [industry, setIndustry] = useState<string>('Healthcare');
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const urlValid = /^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(companyUrl.trim());
-  const valid = industry && urlValid && /.+@.+\..+/.test(email);
+  const valid = urlValid && /.+@.+\..+/.test(email);
 
   const loadingCompanyHint = companyUrl.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0] || 'your company';
 
@@ -40,7 +33,6 @@ export default function LandingScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyUrl: companyUrl.trim(),
-          industry,
           email: email.trim(),
         }),
       });
@@ -115,28 +107,6 @@ export default function LandingScreen() {
                     <IconAlert size={12} /> Enter a valid URL (e.g. acme.com)
                   </span>
                 )}
-              </label>
-
-              <label className="block">
-                <span className="text-[12px] mono uppercase tracking-wider opacity-60">
-                  Industry
-                </span>
-                <div className="relative mt-1">
-                  <select
-                    className="input appearance-none pr-10"
-                    value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
-                  >
-                    {INDUSTRIES.map((i) => (
-                      <option key={i} value={i}>
-                        {i}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-60">
-                    <IconChevron size={16} />
-                  </span>
-                </div>
               </label>
 
               <label className="block">

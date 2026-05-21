@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { connectDB } from '@/lib/mongodb';
 import { Audit } from '@/models/audit';
 import { runAudit } from '@/lib/audit-engine';
-import { INDUSTRIES, isIndustry } from '@/lib/query-templates';
+import { classifyIndustry } from '@/lib/llm-clients';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -26,9 +26,6 @@ const AuditInput = z.object({
       },
       { message: 'Enter a valid company URL (e.g. acme.com)' }
     ),
-  industry: z.string().refine(isIndustry, {
-    message: `industry must be one of: ${INDUSTRIES.join(', ')}`,
-  }),
   email: z.string().trim().toLowerCase().email().max(200),
 });
 
@@ -64,8 +61,9 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  const { companyUrl, industry, email } = parsed.data;
+  const { companyUrl, email } = parsed.data;
   const companyName = deriveCompanyName(companyUrl);
+  const industry = await classifyIndustry(companyName, companyUrl);
 
   await connectDB();
 
@@ -89,7 +87,7 @@ export async function POST(req: Request) {
   });
 
   try {
-    const result = await runAudit(companyName, industry as (typeof INDUSTRIES)[number], companyUrl);
+    const result = await runAudit(companyName, industry, companyUrl);
 
     audit.status = result.status;
     audit.score = result.score;

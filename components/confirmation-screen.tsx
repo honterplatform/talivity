@@ -2,12 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { TopNav, FooterBar, DecorArcs } from '@/components/chrome';
-import {
-  IconArrowRight,
-  IconArrowUpRight,
-  IconCheck,
-  IconClock,
-} from '@/components/icons';
+import { IconArrowRight, IconCheck, IconClock } from '@/components/icons';
 
 export default function ConfirmationScreen({
   company,
@@ -90,7 +85,7 @@ export default function ConfirmationScreen({
             </p>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mt-12 max-w-[440px] mx-auto">
             <div
               className="rounded-[18px] p-6"
               style={{ background: 'var(--paper-warm)', border: '1px solid var(--paper-line)' }}
@@ -104,22 +99,6 @@ export default function ConfirmationScreen({
                 Book a call directly
                 <IconArrowRight size={16} />
               </button>
-            </div>
-
-            <div className="rounded-[18px] p-6" style={{ background: 'var(--peach)' }}>
-              <div className="eyebrow opacity-70">Read next</div>
-              <div className="serif mt-3 text-[24px] leading-tight">
-                The 2026 AI &amp; Talent report.
-              </div>
-              <p className="text-[13px] opacity-75 mt-2 leading-relaxed">
-                The 60-page deep dive on how frontier models source candidate-facing answers.
-              </p>
-              <a
-                href="#"
-                className="mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium hover:opacity-80"
-              >
-                Download the report <IconArrowUpRight size={14} />
-              </a>
             </div>
           </div>
 

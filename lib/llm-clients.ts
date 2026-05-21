@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { INDUSTRIES, type Industry } from './query-templates';
 
 export type Platform = 'openai' | 'anthropic' | 'gemini';
 
@@ -151,6 +152,43 @@ export async function callGemini(query: string, context?: string): Promise<LLMCa
       response: '',
       error: (err as Error).message ?? 'unknown gemini error',
     };
+  }
+}
+
+/**
+ * Industry classification from a company name + URL. Used to pick the right
+ * query templates and competitor list. Falls back to 'Sales' on any error
+ * (it's the most generic of the available industries).
+ */
+export async function classifyIndustry(
+  companyName: string,
+  companyUrl: string
+): Promise<Industry> {
+  const fallback: Industry = 'Sales';
+  try {
+    const client = getOpenAI();
+    const result = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0,
+      max_tokens: 20,
+      messages: [
+        {
+          role: 'system',
+          content: `You classify companies into exactly one of these hiring industries: ${INDUSTRIES.join(
+            ', '
+          )}. Pick the single best fit based on the company's primary business. Respond with ONLY the category name as written above — no punctuation, no explanation.`,
+        },
+        { role: 'user', content: `Company: ${companyName} (${companyUrl})` },
+      ],
+    });
+    const raw = (result.choices[0]?.message?.content ?? '').trim();
+    const match = INDUSTRIES.find((i) => raw.toLowerCase() === i.toLowerCase());
+    if (match) return match;
+    // Loose contains-match as backup
+    const loose = INDUSTRIES.find((i) => raw.toLowerCase().includes(i.toLowerCase()));
+    return loose ?? fallback;
+  } catch {
+    return fallback;
   }
 }
 
