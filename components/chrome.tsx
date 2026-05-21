@@ -79,10 +79,8 @@ export function DecorArcs({
       {/* Top-right outer: teal, clockwise */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none ${pos} -top-[115px] -right-[115px] z-0`}
+        className={`pointer-events-none ${pos} -top-[60px] -right-[60px] md:-top-[115px] md:-right-[115px] w-[280px] h-[280px] md:w-[560px] md:h-[560px] z-0`}
         style={{
-          width: 560,
-          height: 560,
           animation: 'arc-drift 60s linear infinite',
         }}
       >
@@ -103,10 +101,8 @@ export function DecorArcs({
       {/* Top-right inner: gold, counter-clockwise — starts mirrored */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none ${pos} -top-[115px] -right-[115px] z-0`}
+        className={`pointer-events-none ${pos} -top-[60px] -right-[60px] md:-top-[115px] md:-right-[115px] w-[280px] h-[280px] md:w-[560px] md:h-[560px] z-0`}
         style={{
-          width: 560,
-          height: 560,
           animation: 'arc-drift-reverse 70s linear infinite',
         }}
       >
@@ -130,10 +126,8 @@ export function DecorArcs({
       {/* Bottom-left outer: gold, counter-clockwise */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none ${pos} -bottom-[115px] -left-[115px] z-0`}
+        className={`pointer-events-none ${pos} -bottom-[55px] -left-[55px] md:-bottom-[115px] md:-left-[115px] w-[250px] h-[250px] md:w-[500px] md:h-[500px] z-0`}
         style={{
-          width: 500,
-          height: 500,
           animation: 'arc-drift-reverse 90s linear infinite',
         }}
       >
@@ -154,10 +148,8 @@ export function DecorArcs({
       {/* Bottom-left inner: teal, clockwise — starts mirrored */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none ${pos} -bottom-[115px] -left-[115px] z-0`}
+        className={`pointer-events-none ${pos} -bottom-[55px] -left-[55px] md:-bottom-[115px] md:-left-[115px] w-[250px] h-[250px] md:w-[500px] md:h-[500px] z-0`}
         style={{
-          width: 500,
-          height: 500,
           animation: 'arc-drift 80s linear infinite',
         }}
       >
