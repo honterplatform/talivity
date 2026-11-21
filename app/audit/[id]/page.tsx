@@ -83,6 +83,7 @@ function toViewModel(audit: AuditDoc, id: string): AuditViewModel {
     breakdown?: Record<string, number>;
   };
   const samples = (audit.sampleResponses ?? []) as AuditViewModel['sampleResponses'];
+  const insights = answerInsights(audit);
 
   // Note: no email. The view model is serialised into the page for the
   // browser, and anyone with the link can see the page.
@@ -108,5 +109,41 @@ function toViewModel(audit: AuditDoc, id: string): AuditViewModel {
     notRecognized: audit.notRecognized ?? false,
     errorMessage: audit.errorMessage ?? null,
     createdAt: audit.createdAt ? new Date(audit.createdAt).toISOString() : undefined,
+    ...insights,
+  };
+}
+
+type StoredAnswer = { platform?: string; knows?: boolean; sources?: string[]; competitors?: string[] };
+
+/**
+ * Aggregates over every stored answer (not just the ones that knew the
+ * company). Powers the report for companies AI doesn't recognise: how many
+ * answers knew them per platform, and where AI pointed candidates instead.
+ * Only these totals reach the browser — never the raw answers.
+ */
+function answerInsights(audit: AuditDoc): Pick<AuditViewModel, 'recognition' | 'adviceSourceMix' | 'adviceCompetitor'> {
+  const answers = (audit.responses ?? []) as StoredAnswer[];
+  if (!answers.length) return {};
+
+  const order = ['ChatGPT', 'Claude', 'Gemini'];
+  const byPlatform = new Map<string, { known: number; total: number }>();
+  const sources: Record<string, number> = {};
+  const competitors: Record<string, number> = {};
+  for (const a of answers) {
+    const platform = a.platform ?? 'AI';
+    const entry = byPlatform.get(platform) ?? { known: 0, total: 0 };
+    entry.total++;
+    if (a.knows) entry.known++;
+    byPlatform.set(platform, entry);
+    for (const s of a.sources ?? []) sources[s] = (sources[s] ?? 0) + 1;
+    for (const c of a.competitors ?? []) competitors[c] = (competitors[c] ?? 0) + 1;
+  }
+  const top = Object.entries(competitors).sort((x, y) => y[1] - x[1])[0];
+  return {
+    recognition: [...byPlatform.entries()]
+      .sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]))
+      .map(([platform, v]) => ({ platform, ...v })),
+    adviceSourceMix: sources,
+    adviceCompetitor: { name: top?.[0] ?? null, count: top?.[1] ?? 0 },
   };
 }
