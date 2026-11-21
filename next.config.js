@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
-  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
   // Mongoose must not be bundled into server chunks.

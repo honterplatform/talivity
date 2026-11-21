@@ -40,8 +40,8 @@ lib/
 models/
   audit.ts                 Mongoose schema
 tests/                     `npm test` — parser, domain, scoring, provider-error handling
-next.config.js             output: 'standalone'
-railway.json               Railway build / deploy / healthcheck
+next.config.js
+railway.json               Railway build / deploy / healthcheck (read until 2026-12-01)
 .env.example
 ```
 
@@ -94,10 +94,6 @@ Any provider without a key — or that starts returning auth/out-of-credit error
    - `GOOGLE_AI_API_KEY`
 4. (Optional) Set `NEXT_PUBLIC_APP_URL` to the Railway-generated domain.
 5. **Deploy.** Railway runs `npm run build` then `npm start`. `npm start` honors Railway's dynamic `$PORT`. Health checks hit `/api/health`.
-
-### Why standalone output?
-
-`next.config.js` sets `output: 'standalone'`, which produces a self-contained server bundle (~1/10 the size of `.next` + `node_modules`). This shrinks deploy time and image size on Railway.
 
 ### Why the Mongoose global cache?
 
@@ -156,4 +152,4 @@ Unit tests: `npm test`.
 
 - Audits run in an **in-process queue** inside the Next.js server. That's fine on Railway (a long-lived process); a deploy mid-audit marks that audit failed after a few minutes so the user can retry. On a serverless host you'd need a real job queue.
 - Answers come from the models' built-in knowledge (no web search), so they can differ from what a candidate sees in the ChatGPT / Claude / Gemini apps.
-- `output: 'standalone'` is set but Railway runs `next start`, which logs a harmless warning about it.
+- Railway's `railway.json` (Config as Code) stops being read on 2026-12-01; after that the service uses its dashboard settings (builder Railpack, start command `npm start` from package.json). Set the health check path (`/api/health`) in the Railway dashboard if you want deploys gated on it.
