@@ -7,7 +7,18 @@ import { Wordmark, FooterBar, DecorArcs } from '@/components/chrome';
 import { IconAlert, IconArrowRight, IconCheck } from '@/components/icons';
 import LoadingScreen from '@/components/loading-screen';
 
-export default function LandingScreen() {
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+}
+
+export default function LandingScreen({
+  platforms,
+  queriesPerPlatform,
+}: {
+  platforms: string[];
+  queriesPerPlatform: number;
+}) {
   const router = useRouter();
   const [companyUrl, setCompanyUrl] = useState('');
   const [email, setEmail] = useState('');
@@ -15,10 +26,11 @@ export default function LandingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const urlValid = /^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(companyUrl.trim());
-  const valid = urlValid && /.+@.+\..+/.test(email);
-
-  const loadingCompanyHint = companyUrl.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0] || 'your company';
+  const urlValid = /^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(?:[/?#:].*)?$/i.test(companyUrl.trim());
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+  const valid = urlValid && emailValid;
+  const modelCount = platforms.length;
+  const queryCount = queriesPerPlatform * Math.max(modelCount, 1);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,22 +48,23 @@ export default function LandingScreen() {
           email: email.trim(),
         }),
       });
-      const data = await res.json();
+      // A proxy timeout or crash can return HTML; don't surface "Unexpected token <".
+      const data = (await res.json().catch(() => null)) as { auditId?: string; message?: string } | null;
 
-      if (!res.ok) {
-        setError(data.message ?? data.error ?? 'Something went wrong.');
+      if (!res.ok || !data?.auditId) {
+        setError(data?.message ?? 'Something went wrong starting your audit. Please try again.');
         setSubmitting(false);
         return;
       }
-      router.push(`/audit/${data.auditId}`);
-    } catch (err) {
-      setError((err as Error).message ?? 'Network error');
+      router.push(`/audit/${encodeURIComponent(data.auditId)}`);
+    } catch {
+      setError("We couldn't reach the server. Check your connection and try again.");
       setSubmitting(false);
     }
   }
 
   if (submitting) {
-    return <LoadingScreen company={loadingCompanyHint} />;
+    return <LoadingScreen company="your company" platforms={platforms} />;
   }
 
   return (
@@ -122,7 +135,7 @@ export default function LandingScreen() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                {touched && !/.+@.+\..+/.test(email) && (
+                {touched && !emailValid && (
                   <span
                     className="text-[12px] mt-1 inline-flex items-center gap-1.5"
                     style={{ color: 'var(--accent)' }}
@@ -163,11 +176,13 @@ export default function LandingScreen() {
                 <IconCheck size={12} /> ~60 seconds
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <IconCheck size={12} /> 30 candidate queries
+                <IconCheck size={12} /> {queryCount} candidate queries
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <IconCheck size={12} /> 3 frontier models
-              </span>
+              {modelCount > 0 && (
+                <span className="inline-flex items-center gap-1.5" title={joinNames(platforms)}>
+                  <IconCheck size={12} /> {modelCount} frontier model{modelCount === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
           </form>
         </div>

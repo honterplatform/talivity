@@ -41,14 +41,14 @@ html,
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-manrope), 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'ss01' 1, 'ss02' 1;
   overflow-x: hidden;
 }
 
 .serif {
-  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-manrope), 'Manrope', ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--title);
@@ -63,10 +63,10 @@ body {
   letter-spacing: -0.035em;
 }
 .mono {
-  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-manrope), 'Manrope', ui-sans-serif, system-ui, sans-serif;
 }
 .eyebrow {
-  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-manrope), 'Manrope', ui-sans-serif, system-ui, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 11px;
@@ -127,7 +127,7 @@ body[data-hide-decor] .decor {
   font-size: 15px;
   color: var(--ink);
   transition: border-color 0.15s, background 0.15s;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
 }
 .input:focus {
   outline: none;
@@ -303,7 +303,7 @@ body[data-hide-decor] .decor {
   background: var(--paper-warm);
   border: 1px solid var(--paper-line);
   font-size: 11px;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink);
@@ -336,5 +336,42 @@ body[data-hide-decor] .decor {
 @keyframes arc-drift-reverse {
   to {
     transform: rotate(-360deg);
+  }
+}
+
+/* Verbatim answers keep their paragraph breaks. */
+.verbatim {
+  white-space: pre-line;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Print / "Save as PDF" — the report should print as a clean document.      */
+/* ------------------------------------------------------------------------ */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+  :root {
+    --paper: #ffffff;
+  }
+  html,
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .no-print,
+  [aria-hidden='true'].pointer-events-none {
+    display: none !important;
+  }
+  .screen-enter {
+    animation: none !important;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .card-hover:hover {
+    transform: none;
   }
 }

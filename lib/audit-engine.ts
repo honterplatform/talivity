@@ -1,22 +1,43 @@
-import { generateQueries, type Industry } from './query-templates';
+import { generateQueries, type CompetitorGroup, type Industry } from './query-templates';
+import { askPlatform, PLATFORMS, PLATFORM_LABELS, type ErrorKind, type LLMCallResult, type Platform } from './llm-clients';
 import {
-  callAnthropic,
-  callGemini,
-  callOpenAI,
-  classifySentiment,
-  PLATFORM_LABELS,
-  type LLMCallResult,
-  type Platform,
-} from './llm-clients';
-import {
-  isNotRecognized,
+  createCitationParser,
+  emptySourceMix,
   mergeCompetitorMentions,
   mergeSourceMixes,
-  parseResponseCitations,
   SOURCE_LABELS,
+  THIRD_PARTY_KEYS,
+  type ParsedCitations,
   type SourceKey,
 } from './citation-parser';
-import { computeScore, type ScoringOutput } from './scoring';
+import { analyzeResponses, summarizeSentiment, type ResponseSentiment } from './analysis';
+import { computeScore, type ScoreBreakdown, type Sentiment } from './scoring';
+
+export type AuditStage = 'queued' | 'profiling' | 'querying' | 'analyzing' | 'complete' | 'failed';
+
+export interface PlatformProgress {
+  total: number;
+  done: number;
+  failed: number;
+}
+
+export interface AuditProgress {
+  stage: AuditStage;
+  total: number;
+  done: number;
+  byPlatform: Partial<Record<Platform, PlatformProgress>>;
+}
+
+export interface PlatformStat {
+  label: string;
+  model: string;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  errorKinds: Partial<Record<ErrorKind, number>>;
+  sampleError: string | null;
+  avgLatencyMs: number | null;
+}
 
 export interface SampleResponse {
   platform: string;
@@ -25,13 +46,43 @@ export interface SampleResponse {
   sourceCited: string | null;
 }
 
+export interface AuditInput {
+  companyName: string;
+  /** From the profile step; decides whether the prompt needs the domain. */
+  recognized: boolean | null;
+  descriptor?: string;
+  aliases: string[];
+  industry: Industry;
+  competitors: CompetitorGroup[];
+  companyUrl: string;
+  registrableDomain: string;
+}
+
+/** Every answer collected, for transparency and admin debugging. */
+export interface StoredResponse {
+  platform: string;
+  model: string;
+  query: string;
+  response: string;
+  truncated: boolean;
+  knows: boolean;
+  sentiment: ResponseSentiment;
+  sources: SourceKey[];
+  competitors: string[];
+}
+
 export interface AuditResult {
   status: 'complete' | 'failed';
   score: number;
   citationsOwned: number;
   citationsTotal: number;
+  /** Answers actually collected (successful calls). */
   totalResponses: number;
+  /** Answers that contained real information about the company. */
+  substantiveResponses: number;
+  /** Platforms that returned at least one answer. */
   platformsUsed: number;
+  platforms: string[];
   sourceMix: Record<SourceKey, number>;
   sampleResponses: SampleResponse[];
   competitors: {
@@ -39,148 +90,286 @@ export interface AuditResult {
     competitorCitations: number;
     breakdown: Record<string, number>;
   };
-  sentiment: 'positive' | 'neutral' | 'negative';
+  sentiment: Sentiment;
+  sentimentBreakdown: Record<ResponseSentiment, number>;
   notRecognized: boolean;
   errorMessage: string | null;
-  scoreBreakdown: ScoringOutput['breakdown'];
+  /** Admin-only diagnostic (never shown to the prospect). */
+  internalError: string | null;
+  scoreBreakdown: ScoreBreakdown;
+  platformStats: Partial<Record<Platform, PlatformStat>>;
+  analysisMethod: 'llm' | 'heuristic';
+  queries: string[];
+  responses: StoredResponse[];
 }
 
-export async function runAudit(
-  companyName: string,
-  industry: Industry,
-  companyUrl: string
-): Promise<AuditResult> {
-  const queries = generateQueries(companyName, industry);
-  const context = `Context: The company is ${companyName} (website: ${companyUrl}). Answer the following question about this specific company.`;
+/** Stop waiting for stragglers after this long and score what we have. */
+const AUDIT_DEADLINE_MS = 120_000;
 
-  // Fire all calls in parallel — Gemini only included if its key is configured.
-  const useGemini = !!process.env.GOOGLE_AI_API_KEY;
-  const platformsUsed = useGemini ? 3 : 2;
-  const totalResponses = queries.length * platformsUsed;
-  const callPromises: Promise<LLMCallResult>[] = [];
-  for (const q of queries) {
-    callPromises.push(callOpenAI(q, context), callAnthropic(q, context));
-    if (useGemini) callPromises.push(callGemini(q, context));
-  }
-  const allResults = await Promise.all(callPromises);
-  const successful = allResults.filter((r) => !r.error && r.response.length > 0);
+/** Share of answers that must say "I don't know this company" to flag it. */
+const NOT_RECOGNIZED_THRESHOLD = 0.6;
 
-  // All failed → bail out cleanly.
+export interface RunAuditHooks {
+  onProgress?: (progress: AuditProgress) => void;
+}
+
+export async function runAudit(input: AuditInput, platforms: Platform[], hooks: RunAuditHooks = {}): Promise<AuditResult> {
+  const queries = generateQueries(input.companyName, input.industry);
+  const context = buildContext(input);
+
+  const progress: AuditProgress = {
+    stage: 'querying',
+    total: queries.length * platforms.length,
+    done: 0,
+    byPlatform: {},
+  };
+  for (const p of platforms) progress.byPlatform[p] = { total: queries.length, done: 0, failed: 0 };
+  const emit = () => hooks.onProgress?.(structuredClone(progress));
+  emit();
+
+  // Fan out every (query × platform) call in parallel.
+  const slots: { platform: Platform; query: string; result?: LLMCallResult }[] = [];
+  for (const query of queries) for (const platform of platforms) slots.push({ platform, query });
+
+  let collecting = true;
+  const tasks = slots.map((slot) =>
+    askPlatform(slot.platform, slot.query, context).then((result) => {
+      if (!collecting) return; // arrived after the deadline — ignore
+      slot.result = result;
+      const bp = progress.byPlatform[slot.platform]!;
+      bp.done++;
+      if (result.error) bp.failed++;
+      progress.done++;
+      emit();
+    })
+  );
+
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    Promise.all(tasks),
+    new Promise<void>((resolve) => {
+      deadline = setTimeout(resolve, AUDIT_DEADLINE_MS);
+    }),
+  ]);
+  clearTimeout(deadline);
+  collecting = false;
+
+  const all: LLMCallResult[] = slots.map(
+    (s) =>
+      s.result ?? {
+        platform: s.platform,
+        model: '',
+        query: s.query,
+        response: '',
+        truncated: false,
+        latencyMs: AUDIT_DEADLINE_MS,
+        error: 'Timed out',
+        errorKind: 'timeout',
+      }
+  );
+
+  const platformStats = buildPlatformStats(all, platforms);
+  logPlatformFailures(platformStats);
+
+  const successful = all.filter((r) => !r.error && r.response.trim().length > 0);
+  const answeredPlatforms = PLATFORMS.filter((p) => successful.some((r) => r.platform === p));
+
   if (successful.length === 0) {
     return {
+      ...emptyResult(queries, platformStats),
       status: 'failed',
-      score: 0,
-      citationsOwned: 0,
-      citationsTotal: 0,
-      totalResponses,
-      platformsUsed,
-      sourceMix: emptySourceMix(),
-      sampleResponses: [],
-      competitors: { topCompetitor: null, competitorCitations: 0, breakdown: {} },
-      sentiment: 'neutral',
-      notRecognized: false,
-      errorMessage: 'All AI platforms failed to respond. Please try again.',
-      scoreBreakdown: { ownedRatio: 0, sentiment: 0, competitiveDominance: 0, sourceDiversity: 0 },
+      errorMessage: 'The AI platforms did not respond. Please try again in a few minutes.',
+      internalError: summarizeFailures(platformStats),
     };
   }
 
-  // Detect "company not recognized" — if a majority of successful responses say they don't know
-  // the company, we don't have enough signal to score.
-  const notRecognizedCount = successful.filter((r) => isNotRecognized(r.response)).length;
-  const notRecognized = notRecognizedCount >= Math.ceil(successful.length * 0.6);
+  progress.stage = 'analyzing';
+  emit();
 
-  // Parse each successful response.
-  const parsed = successful.map((r) => ({
-    result: r,
-    parsed: parseResponseCitations(r.response, companyName, industry, companyUrl),
+  // Which answers actually know the company, and with what tone.
+  const analysis = await analyzeResponses(
+    input.companyName,
+    successful.map((r) => r.response)
+  );
+  const judgements = analysis.judgements;
+  const unknownCount = judgements.filter((j) => !j.knows).length;
+  const notRecognized = unknownCount >= Math.ceil(successful.length * NOT_RECOGNIZED_THRESHOLD);
+
+  // Only answers that know the company can cite sources about it. "I don't
+  // know them — try Glassdoor or their careers page" is advice, not a citation.
+  const parse = createCitationParser({
+    companyName: input.companyName,
+    aliases: input.aliases,
+    registrableDomain: input.registrableDomain,
+    competitors: input.competitors,
+  });
+  const parsedAll = successful.map((result) => ({ result, parsed: parse(result.response) }));
+  const substantive = parsedAll.filter((_, i) => judgements[i]?.knows);
+  const responses: StoredResponse[] = parsedAll.map(({ result, parsed }, i) => ({
+    platform: PLATFORM_LABELS[result.platform],
+    model: result.model,
+    query: result.query,
+    response: result.response,
+    truncated: result.truncated,
+    knows: judgements[i]?.knows ?? false,
+    sentiment: judgements[i]?.sentiment ?? 'neutral',
+    sources: (Object.keys(parsed.sourceMix) as SourceKey[]).filter((k) => parsed.sourceMix[k] > 0),
+    competitors: Object.keys(parsed.competitorMentions),
   }));
 
-  const sourceMix = mergeSourceMixes(parsed.map((p) => p.parsed.sourceMix));
-  const competitorMentions = mergeCompetitorMentions(parsed.map((p) => p.parsed.competitorMentions));
+  const sourceMix = mergeSourceMixes(substantive.map((p) => p.parsed.sourceMix));
+  const competitorMentions = mergeCompetitorMentions(substantive.map((p) => p.parsed.competitorMentions));
+  const sentimentSummary = summarizeSentiment(judgements);
+  const sentiment: Sentiment = notRecognized ? 'neutral' : sentimentSummary.overall;
 
-  // Sentiment pass over the concatenated text.
-  const concatenated = successful.map((r) => r.response).join('\n\n---\n\n');
-  const sentiment = notRecognized ? 'neutral' : await classifySentiment(concatenated);
-
-  // Score.
-  const scoring = computeScore({
-    sourceMix,
-    competitorMentions,
-    totalResponses: successful.length,
-    sentiment,
-  });
-
-  // Pick 3 sample responses — one per platform, prioritizing the ones that best illustrate
-  // a third-party-source-heavy or negative answer.
-  const sampleResponses = pickSampleResponses(parsed);
+  const scoring = computeScore({ sourceMix, competitorMentions, sentiment });
 
   return {
     status: 'complete',
     score: notRecognized ? 0 : scoring.score,
     citationsOwned: scoring.citationsOwned,
     citationsTotal: scoring.citationsTotal,
-    totalResponses,
-    platformsUsed,
+    totalResponses: successful.length,
+    substantiveResponses: substantive.length,
+    platformsUsed: answeredPlatforms.length,
+    platforms: answeredPlatforms.map((p) => PLATFORM_LABELS[p]),
     sourceMix,
-    sampleResponses,
+    sampleResponses: pickSampleResponses(substantive.length ? substantive : parsedAll),
     competitors: {
       topCompetitor: scoring.topCompetitor,
       competitorCitations: scoring.competitorCitations,
       breakdown: competitorMentions,
     },
     sentiment,
+    sentimentBreakdown: sentimentSummary.breakdown,
     notRecognized,
     errorMessage: notRecognized
       ? "We couldn't find enough information about this company in the major AI platforms."
       : null,
+    internalError: platformStatsHaveFailures(platformStats) ? summarizeFailures(platformStats) : null,
     scoreBreakdown: scoring.breakdown,
+    platformStats,
+    analysisMethod: analysis.method,
+    queries,
+    responses,
   };
 }
 
-function emptySourceMix(): Record<SourceKey, number> {
+/**
+ * The context line in front of every candidate query.
+ *
+ * Recognised companies get their name plus a short descriptor — not the URL.
+ * Handing the model the URL made it echo it back ("check careers.walmart.com"),
+ * which the parser then scored as an owned citation: the tool was inflating its
+ * own headline metric. The domain is only included when the model didn't
+ * recognise the company and needs it to disambiguate.
+ */
+export function buildContext(input: Pick<AuditInput, 'companyName' | 'recognized' | 'descriptor' | 'registrableDomain'>): string {
+  const who = input.recognized
+    ? `${input.companyName}${input.descriptor ? ` (${input.descriptor})` : ''}`
+    : `${input.companyName} (website: ${input.registrableDomain})`;
+  return `Context: The company is ${who}. Answer the following question about this specific company.`;
+}
+
+function emptyResult(queries: string[], platformStats: Partial<Record<Platform, PlatformStat>>): AuditResult {
   return {
-    ownSite: 0,
-    glassdoor: 0,
-    indeed: 0,
-    reddit: 0,
-    linkedin: 0,
-    wikipedia: 0,
-    news: 0,
-    other: 0,
+    status: 'failed',
+    score: 0,
+    citationsOwned: 0,
+    citationsTotal: 0,
+    totalResponses: 0,
+    substantiveResponses: 0,
+    platformsUsed: 0,
+    platforms: [],
+    sourceMix: emptySourceMix(),
+    sampleResponses: [],
+    competitors: { topCompetitor: null, competitorCitations: 0, breakdown: {} },
+    sentiment: 'neutral',
+    sentimentBreakdown: { positive: 0, neutral: 0, negative: 0, mixed: 0 },
+    notRecognized: false,
+    errorMessage: null,
+    internalError: null,
+    scoreBreakdown: { ownedRatio: 0, sentiment: 0, competitiveDominance: 0, sourceDiversity: 0 },
+    platformStats,
+    analysisMethod: 'heuristic',
+    queries,
+    responses: [],
   };
 }
 
-function pickSampleResponses(
-  parsed: { result: LLMCallResult; parsed: ReturnType<typeof parseResponseCitations> }[]
-): SampleResponse[] {
-  const byPlatform: Record<Platform, typeof parsed> = {
-    openai: [],
-    anthropic: [],
-    gemini: [],
-  };
-  for (const p of parsed) byPlatform[p.result.platform].push(p);
+function buildPlatformStats(all: LLMCallResult[], platforms: Platform[]): Partial<Record<Platform, PlatformStat>> {
+  const stats: Partial<Record<Platform, PlatformStat>> = {};
+  for (const platform of platforms) {
+    const rows = all.filter((r) => r.platform === platform);
+    const ok = rows.filter((r) => !r.error);
+    const failed = rows.filter((r) => r.error);
+    const errorKinds: Partial<Record<ErrorKind, number>> = {};
+    for (const f of failed) {
+      const k = f.errorKind ?? 'unknown';
+      errorKinds[k] = (errorKinds[k] ?? 0) + 1;
+    }
+    stats[platform] = {
+      label: PLATFORM_LABELS[platform],
+      model: rows.find((r) => r.model)?.model ?? '',
+      attempted: rows.length,
+      succeeded: ok.length,
+      failed: failed.length,
+      errorKinds,
+      sampleError: failed[0]?.error?.slice(0, 300) ?? null,
+      avgLatencyMs: ok.length ? Math.round(ok.reduce((a, r) => a + r.latencyMs, 0) / ok.length) : null,
+    };
+  }
+  return stats;
+}
 
-  const scoreCandidate = (p: typeof parsed[number]): number => {
-    // Higher = better illustration of the problem (third-party-heavy, no owned site).
-    const ownsHit = p.parsed.ownSiteMentioned ? -50 : 0;
+function platformStatsHaveFailures(stats: Partial<Record<Platform, PlatformStat>>): boolean {
+  return Object.values(stats).some((s) => s && s.failed > 0);
+}
+
+function summarizeFailures(stats: Partial<Record<Platform, PlatformStat>>): string {
+  return Object.values(stats)
+    .filter((s): s is PlatformStat => !!s && s.failed > 0)
+    .map((s) => {
+      const kinds = Object.entries(s.errorKinds)
+        .map(([k, n]) => `${k}×${n}`)
+        .join(', ');
+      return `${s.label}: ${s.failed}/${s.attempted} failed (${kinds})${s.sampleError ? ` — ${s.sampleError}` : ''}`;
+    })
+    .join(' | ');
+}
+
+function logPlatformFailures(stats: Partial<Record<Platform, PlatformStat>>) {
+  for (const s of Object.values(stats)) {
+    if (s && s.failed > 0) {
+      console.error(
+        `[audit] ${s.label} (${s.model || 'n/a'}): ${s.failed}/${s.attempted} calls failed — ${JSON.stringify(s.errorKinds)}${s.sampleError ? ` — e.g. ${s.sampleError}` : ''}`
+      );
+    }
+  }
+}
+
+/**
+ * One sample per platform, preferring the answer that best illustrates the
+ * problem (third-party-heavy, competitors named, no owned citation).
+ */
+function pickSampleResponses(parsed: { result: LLMCallResult; parsed: ParsedCitations }[]): SampleResponse[] {
+  const scoreCandidate = (p: (typeof parsed)[number]): number => {
+    const thirdParty = THIRD_PARTY_KEYS.reduce((a, k) => a + p.parsed.sourceMix[k], 0);
     const competitorCount = Object.values(p.parsed.competitorMentions).reduce((a, b) => a + b, 0);
-    const thirdPartyTotal =
-      p.parsed.sourceMix.glassdoor +
-      p.parsed.sourceMix.indeed +
-      p.parsed.sourceMix.reddit +
-      p.parsed.sourceMix.linkedin +
-      p.parsed.sourceMix.wikipedia +
-      p.parsed.sourceMix.news +
-      p.parsed.sourceMix.other;
-    return thirdPartyTotal * 10 + competitorCount * 5 + ownsHit + p.result.response.length / 200;
+    return (
+      thirdParty * 10 +
+      competitorCount * 5 +
+      (p.parsed.ownSiteMentioned ? -50 : 0) +
+      (p.result.truncated ? 0 : 3) +
+      Math.min(p.result.response.length, 1200) / 200
+    );
   };
 
   const samples: SampleResponse[] = [];
-  for (const platform of ['openai', 'anthropic', 'gemini'] as Platform[]) {
-    const list = byPlatform[platform];
+  for (const platform of PLATFORMS) {
+    const list = parsed.filter((p) => p.result.platform === platform);
     if (!list.length) continue;
-    list.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
-    const top = list[0];
+    const top = [...list].sort((a, b) => scoreCandidate(b) - scoreCandidate(a))[0];
     samples.push({
       platform: PLATFORM_LABELS[platform],
       query: top.result.query,

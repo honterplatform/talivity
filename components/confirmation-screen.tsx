@@ -6,10 +6,14 @@ import { IconArrowRight, IconCheck, IconClock } from '@/components/icons';
 
 export default function ConfirmationScreen({
   company,
-  email,
+  maskedEmail,
+  auditId,
+  bookingUrl,
 }: {
   company?: string;
-  email?: string;
+  maskedEmail?: string | null;
+  auditId?: string;
+  bookingUrl: string;
 }) {
   const router = useRouter();
 
@@ -21,7 +25,7 @@ export default function ConfirmationScreen({
       <DecorArcs />
       <TopNav tone="paper" />
 
-      <div className="flex-1 flex items-center justify-center px-8">
+      <div className="flex-1 flex items-center justify-center px-6 sm:px-8">
         <div className="w-full max-w-[720px] relative">
           <div className="relative mx-auto" style={{ width: 120, height: 120 }}>
             <div
@@ -65,23 +69,25 @@ export default function ConfirmationScreen({
                 letterSpacing: '-0.02em',
               }}
             >
-              Your report is{' '}
+              We'll be{' '}
               <em className="italic" style={{ color: 'var(--accent)' }}>
-                on its way
+                in touch
               </em>
               .
             </h1>
             <p className="mt-5 text-[17px] opacity-75 max-w-[520px] mx-auto leading-relaxed">
-              Check{' '}
-              {email ? (
-                <span className="font-medium" style={{ color: 'var(--ink)' }}>
-                  {email}
-                </span>
-              ) : (
-                'your inbox'
-              )}{' '}
-              in the next 2 minutes. The full PDF includes every cited source and the raw model
-              responses we collected{company ? ` for ${company}` : ''}.
+              Our AI Search team will reach out
+              {maskedEmail ? (
+                <>
+                  {' '}
+                  at{' '}
+                  <span className="font-medium" style={{ color: 'var(--ink)' }}>
+                    {maskedEmail}
+                  </span>
+                </>
+              ) : null}{' '}
+              to schedule your strategy session
+              {company ? ` and walk through what AI is saying about ${company}` : ''}.
             </p>
           </div>
 
@@ -90,27 +96,34 @@ export default function ConfirmationScreen({
               className="rounded-[18px] p-6"
               style={{ background: 'var(--paper-warm)', border: '1px solid var(--paper-line)' }}
             >
-              <div className="eyebrow opacity-70">While you wait</div>
+              <div className="eyebrow opacity-70">Prefer not to wait?</div>
               <div className="serif mt-3 text-[24px] leading-tight">Want to talk now?</div>
               <p className="text-[13px] opacity-70 mt-2 leading-relaxed">
-                Skip the wait — grab a 30-minute slot with our AI Search team this week.
+                Skip the back-and-forth — grab a 30-minute slot with our AI Search team this week.
               </p>
-              <button className="btn-ink mt-5 w-full justify-center">
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ink mt-5 w-full justify-center"
+              >
                 Book a call directly
                 <IconArrowRight size={16} />
-              </button>
+              </a>
             </div>
           </div>
 
-          <div className="mt-12 flex items-center justify-center gap-2 text-[12px] opacity-60">
-            <IconClock size={12} />
-            <span className="mono">Average delivery time · 1m 48s</span>
-            <span>·</span>
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="underline hover:opacity-80"
-            >
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-2 text-[12px] opacity-60">
+            {auditId && (
+              <>
+                <IconClock size={12} />
+                <a href={`/audit/${encodeURIComponent(auditId)}`} className="underline hover:opacity-80">
+                  Back to your report
+                </a>
+                <span>·</span>
+              </>
+            )}
+            <button type="button" onClick={() => router.push('/')} className="underline hover:opacity-80">
               Run another audit
             </button>
           </div>

@@ -28,6 +28,13 @@ export function TopNav({ tone = 'paper' }: { tone?: Tone }) {
   );
 }
 
+// Inlined at build time (NEXT_PUBLIC_*). Defaults are Talivity's live pages.
+const FOOTER_LINKS = [
+  { label: 'Privacy', href: process.env.NEXT_PUBLIC_PRIVACY_URL || 'https://talivity.com/privacy' },
+  { label: 'Terms', href: process.env.NEXT_PUBLIC_TERMS_URL || 'https://talivity.com/terms' },
+  { label: 'Contact', href: process.env.NEXT_PUBLIC_CONTACT_URL || 'https://talivity.com/contact' },
+];
+
 export function FooterBar({ tone = 'paper' }: { tone?: Tone }) {
   const dark = tone === 'ink';
   return (
@@ -37,17 +44,15 @@ export function FooterBar({ tone = 'paper' }: { tone?: Tone }) {
           dark ? 'text-white/60' : 'text-black/60'
         }`}
       >
-        <span className="mono">© Copyright 2026 Talivity LLC</span>
+        <span className="mono" suppressHydrationWarning>
+          © Copyright {new Date().getFullYear()} Talivity LLC
+        </span>
         <div className="flex gap-6">
-          <a href="#" className="hover:underline">
-            Privacy
-          </a>
-          <a href="#" className="hover:underline">
-            Terms
-          </a>
-          <a href="#" className="hover:underline">
-            Contact
-          </a>
+          {FOOTER_LINKS.map((l) => (
+            <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+              {l.label}
+            </a>
+          ))}
         </div>
       </div>
     </footer>

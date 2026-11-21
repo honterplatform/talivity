@@ -2,40 +2,44 @@
 
 A working prototype that audits how the major AI assistants (ChatGPT, Claude, Gemini) describe a company to job seekers. Built for Talivity as a lead-gen tool.
 
-A user enters `company + industry + email`. The app generates ~10 candidate-style queries, fans them out across the three LLMs (30 calls total, in parallel), parses each response for source citations and competitor mentions, scores AI visibility 0–100, and stores the result in MongoDB for sales follow-up.
+A user enters `company website + email`. The app identifies the company (name, aliases, industry, talent competitors), asks ~10 candidate-style questions to each available LLM in parallel (up to 30 calls), judges which answers actually know the company and their tone, parses citations and competitor mentions, scores AI visibility 0–100, and stores the result in MongoDB for sales follow-up.
 
 ## Stack
 
-- **Next.js 14** (App Router) — frontend + API routes
-- **TypeScript**, **Tailwind CSS**
+- **Next.js 15** (App Router) + **React 19** — frontend + API routes
+- **TypeScript**, **Tailwind CSS**, **Lucide** icons, Manrope via `next/font`
 - **MongoDB** via **Mongoose** (Railway plugin in prod)
-- **openai**, **@anthropic-ai/sdk**, **@google/generative-ai**
-- **Recharts**, **Lucide**, **shadcn/ui** primitives
+- **openai**, **@anthropic-ai/sdk**; Gemini via its REST API (the old `@google/generative-ai` SDK is deprecated)
 - **Railway** for deployment
 
 ## Project layout
 
 ```
 app/
-  page.tsx                 Landing form
-  audit/[id]/page.tsx      Results (loads from MongoDB)
-  api/audit/route.ts       POST: kick off audit, save, return id
-  api/audit/[id]/route.ts  GET: fetch a saved audit
-  api/health/route.ts      GET: Railway health check
-components/
-  landing-screen.tsx
-  loading-screen.tsx
-  results-screen.tsx
-  confirmation-screen.tsx
+  page.tsx                     Landing form
+  audit/[id]/page.tsx          Loading screen while running, then the report
+  thanks/page.tsx              After "Book your strategy session"
+  admin/page.tsx               Audits table + provider health (Basic Auth)
+  api/audit/route.ts           POST: validate, rate-limit, enqueue, return id (202)
+  api/audit/[id]/route.ts      GET: status + progress (no PII) — polled by the loading screen
+  api/audit/[id]/cta/route.ts  POST: record a "Book" click (hot lead)
+  api/health/route.ts          GET: Railway health check
+components/                    landing / loading / results / confirmation screens
 lib/
-  audit-engine.ts          Orchestrator: queries -> LLMs -> parse -> score
-  llm-clients.ts           OpenAI / Anthropic / Gemini wrappers
-  query-templates.ts       10 questions per industry, competitor lists
-  citation-parser.ts       Regex-based source + competitor detection
+  audit-runner.ts          In-process queue: profile -> audit -> save, progress heartbeats
+  company-profile.ts       URL -> company name, aliases, industry, talent competitors
+  audit-engine.ts          Queries -> LLMs -> analysis -> parse -> score
+  llm-clients.ts           Providers, timeouts, adaptive params, out-of-credits breaker
+  analysis.ts              One batched LLM call: does each answer know the company? tone?
+  citation-parser.ts       Source + competitor detection
   scoring.ts               0-100 composite score
-  mongodb.ts               Cached Mongoose connection (serverless-safe)
+  rate-limit.ts            Per-email / per-IP / global limits (MongoDB-backed)
+  audit-lookup.ts          Public-id lookup, stale-audit expiry
+  domain.ts, text.ts       URL parsing, text cleanup
+  mongodb.ts               Cached Mongoose connection
 models/
   audit.ts                 Mongoose schema
+tests/                     `npm test` — parser, domain, scoring, provider-error handling
 next.config.js             output: 'standalone'
 railway.json               Railway build / deploy / healthcheck
 .env.example
@@ -59,23 +63,32 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open <http://localhost:3000>, fill in the form, watch the audit run.
+Open <http://localhost:8080>, fill in the form, watch the audit run.
 
 ### Env vars
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | yes | sk-... |
-| `ANTHROPIC_API_KEY` | yes | sk-ant-... |
-| `GOOGLE_AI_API_KEY` | yes | Google AI Studio key (Gemini) |
+| `OPENAI_API_KEY` | one of the three | sk-... |
+| `ANTHROPIC_API_KEY` | one of the three | sk-ant-... |
+| `GOOGLE_AI_API_KEY` | one of the three | Google AI Studio key (Gemini). `GEMINI_API_KEY` also works. |
 | `MONGO_URL` | yes | Mongo connection string. Locally `mongodb://localhost:27017/talivity-audit`; on Railway auto-injected by the MongoDB plugin. |
-| `NEXT_PUBLIC_APP_URL` | no | Public base URL for og tags / emails |
+| `ADMIN_PASSWORD` / `ADMIN_USER` | yes for `/admin` | Basic Auth for the admin panel |
+| `OPENAI_MODEL` / `ANTHROPIC_MODEL` / `GEMINI_MODEL` | no | Override a model when a provider retires one (defaults: `gpt-4o-mini`, `claude-haiku-5-5`, `gemini-3.8-flash`) |
+| `HELPER_PROVIDERS` | no | Provider order for the helper steps (company profile, answer analysis). Default `anthropic,openai,gemini` — Claude first |
+| `RATE_LIMIT_DISABLED` | no | `true` to switch rate limiting off while testing |
+| `RATE_LIMIT_PER_EMAIL_PER_HOUR` / `_PER_IP_PER_HOUR` / `_GLOBAL_PER_DAY` | no | Defaults 3 / 10 / 500 |
+| `AUDIT_MAX_CONCURRENCY` | no | Audits running at once per server (default 4) |
+| `NEXT_PUBLIC_BOOKING_URL` | no | "Book a call" link (default talivity.com/contact) |
+| `NEXT_PUBLIC_APP_URL` | no | Public base URL for og tags |
+
+Any provider without a key — or that starts returning auth/out-of-credit errors — is skipped automatically (and shown as paused in `/admin`), so audits keep running on the rest.
 
 ## Deploying to Railway
 
 1. **Create a new Railway project** and connect this GitHub repo. Railway auto-detects Next.js via Nixpacks; `railway.json` is included as a fallback.
 2. **Add the MongoDB plugin** to the project. Railway auto-injects `MONGO_URL` into the Next.js service — no manual wiring needed.
-3. **Add the three LLM API keys** in the service's Variables tab:
+3. **Add the LLM API keys** (and `ADMIN_PASSWORD`) in the service's Variables tab:
    - `OPENAI_API_KEY`
    - `ANTHROPIC_API_KEY`
    - `GOOGLE_AI_API_KEY`
@@ -92,53 +105,55 @@ Next.js dev (and certain Railway hot-reload scenarios) recompile module scope fr
 
 ## How the audit engine works
 
-For each audit:
+For each audit (runs in the background; the browser polls for progress):
 
-1. **Generate queries.** 10 industry-specific candidate questions, with `{company}` substituted.
-2. **Parallel LLM fan-out.** 30 simultaneous calls (10 queries × 3 platforms). Per-call try/catch — one provider failing doesn't kill the run.
-3. **Parse each response** for: own-site citations (careers/jobs subdomains, "their site"), Glassdoor / Indeed / Reddit / LinkedIn / Wikipedia, news outlets, and industry-specific competitor names.
-4. **Sentiment pass.** One additional cheap LLM classification on the aggregated text (positive / neutral / negative).
-5. **Score.** Composite of:
+1. **Profile the company.** One LLM call turns the URL into a brand name, aliases, industry and up to 8 talent competitors (merged with a static national list). `careers.walmart.com` → "Walmart"; `kp.org` → "Kaiser Permanente". Falls back to the domain name if no provider answers.
+2. **Generate queries.** 10 industry-specific candidate questions (a `General` set for companies outside the 9 industries).
+3. **Parallel LLM fan-out.** Up to 30 calls (10 queries × available providers), each with a timeout; stragglers are cut off at 120 s. For recognised companies the prompt names the company — not its URL, which models echoed back and the parser then scored as an owned citation.
+4. **Analyse.** One batched LLM call labels every answer: does it actually know the company, and what's the tone? Answers that only say "I don't know them — check Glassdoor" are not counted as citations. Regex fallback if the call fails.
+5. **Parse** the substantive answers for owned-site citations, Glassdoor / Indeed / Reddit / LinkedIn / Wikipedia / news / other review sites, and competitor mentions.
+6. **Score.** Composite of:
    - 50 pts — owned-vs-third-party citation ratio
    - 25 pts — sentiment
    - 15 pts — competitive dominance
    - 10 pts — source diversity (penalize one source dominating)
 
-   Capped at 95 — no perfect scores in the prototype.
-6. **Persist.** Update the audit document with status `complete`, score, source mix, sample responses, competitor breakdown.
+   Capped at 95 — no perfect scores.
+7. **Persist** the score, source mix, samples, every answer (admin/debugging), per-provider success stats and score breakdown.
 
 ### "Not recognized" handling
 
-If a majority of successful responses say variants of "I don't have specific information about this company," the audit is flagged `notRecognized` and the results screen shows a softer message instead of a 0-score report.
+If 60%+ of the answers don't know the company, the audit is flagged `notRecognized` and the results screen shows a softer message instead of a 0-score report.
 
 ## API surface
 
 | Method | Path | Body / Params | Result |
 | --- | --- | --- | --- |
-| `POST` | `/api/audit` | `{ companyName, industry, email }` | `{ auditId }` (200) / `{ error, ... }` (400/429/500) |
-| `GET` | `/api/audit/[id]` | — | `{ audit }` |
+| `POST` | `/api/audit` | `{ companyUrl, email }` | `{ auditId }` (202) / `{ error, message }` (400/429/500/503) |
+| `GET` | `/api/audit/[id]` | — | `{ audit: { status, companyName, progress } }` — no PII |
+| `POST` | `/api/audit/[id]/cta` | — | `{ ok }` — records a "Book" click |
 | `GET` | `/api/health` | — | `{ status: 'ok' }` |
 
-`POST /api/audit` rate-limits to **one audit per email per hour** (DB lookup, not in-memory — works across Railway replicas).
+`auditId` is a random 16-character id (MongoDB ObjectIds are partly sequential and could be enumerated). Links to audits created before this change keep working by ObjectId.
+
+`POST /api/audit` is rate-limited per email, per IP and globally (MongoDB counts — works across Railway replicas). Failed audits don't count against a person.
 
 ## Testing the audit end-to-end
 
 After setting env vars:
 
 ```bash
-curl -X POST http://localhost:3000/api/audit \
+curl -X POST http://localhost:8080/api/audit \
   -H 'Content-Type: application/json' \
-  -d '{
-    "companyName": "Kaiser Permanente",
-    "industry": "Healthcare",
-    "email": "test@example.com"
-  }'
+  -d '{ "companyUrl": "kp.org", "email": "test@example.com" }'
 ```
 
-The POST blocks ~20–40 s while the audit runs. Take the returned `auditId` and visit `http://localhost:3000/audit/<id>`.
+The POST returns immediately; open `http://localhost:8080/audit/<auditId>` to watch it run (typically 10–60 s).
 
-## What's a prototype-grade simplification?
+Unit tests: `npm test`.
 
-- The audit runs **inline** inside the POST handler (no job queue). The frontend just sits on the loading screen until the response returns. For production volume, move `runAudit()` to a background worker and have the frontend poll `GET /api/audit/[id]`.
-- Competitor lists are **hardcoded** per industry. Production would pull these from a managed source.
-- No auth, no admin panel, no email send — the captured leads sit in Mongo for sales to pull.
+## Known limitations
+
+- Audits run in an **in-process queue** inside the Next.js server. That's fine on Railway (a long-lived process); a deploy mid-audit marks that audit failed after a few minutes so the user can retry. On a serverless host you'd need a real job queue.
+- Answers come from the models' built-in knowledge (no web search), so they can differ from what a candidate sees in the ChatGPT / Claude / Gemini apps.
+- `output: 'standalone'` is set but Railway runs `next start`, which logs a harmless warning about it.
