@@ -74,7 +74,7 @@ Open <http://localhost:8080>, fill in the form, watch the audit run.
 | `GOOGLE_AI_API_KEY` | one of the three | Google AI Studio key (Gemini). `GEMINI_API_KEY` also works. |
 | `MONGO_URL` | yes | Mongo connection string. Locally `mongodb://localhost:27017/talivity-audit`; on Railway auto-injected by the MongoDB plugin. |
 | `ADMIN_PASSWORD` / `ADMIN_USER` | yes for `/admin` | Basic Auth for the admin panel |
-| `OPENAI_MODEL` / `ANTHROPIC_MODEL` / `GEMINI_MODEL` | no | Override a model when a provider retires one (defaults: `gpt-4o-mini`, `claude-haiku-5-5`, `gemini-3.8-flash`) |
+| `OPENAI_MODEL` / `ANTHROPIC_MODEL` / `GEMINI_MODEL` | no | Override a model when a provider retires one (defaults: `gpt-5.4-mini`, `claude-haiku-5-5`, `gemini-3.8-flash`) |
 | `HELPER_PROVIDERS` | no | Provider order for the helper steps (company profile, answer analysis). Default `anthropic,openai,gemini` — Claude first |
 | `RATE_LIMIT_DISABLED` | no | `true` to switch rate limiting off while testing |
 | `RATE_LIMIT_PER_EMAIL_PER_HOUR` / `_PER_IP_PER_HOUR` / `_GLOBAL_PER_DAY` | no | Defaults 3 / 10 / 500 |
