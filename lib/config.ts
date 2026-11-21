@@ -31,7 +31,7 @@ function flag(name: string): boolean {
 export const settings = {
   // Models used to answer the candidate queries. Override per provider when a
   // model is retired — no code deploy needed.
-  openaiModel: () => str('OPENAI_MODEL', 'gpt-4o-mini'),
+  openaiModel: () => str('OPENAI_MODEL', 'gpt-5.4-mini'),
   anthropicModel: () => str('ANTHROPIC_MODEL', 'claude-haiku-5-5'),
   geminiModel: () => str('GEMINI_MODEL', 'gemini-3.8-flash'),
 

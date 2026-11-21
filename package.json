@@ -2,6 +2,9 @@
   "name": "talivity-ai-visibility-audit",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "dev": "next dev -p ${PORT:-8080}",
     "build": "next build",
