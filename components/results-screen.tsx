@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopNav, FooterBar, DecorArcs } from '@/components/chrome';
@@ -41,6 +40,11 @@ export interface AuditViewModel {
   notRecognized?: boolean;
   errorMessage?: string | null;
   createdAt?: string;
+  /** Per platform: answers that actually knew the company. */
+  recognition?: { platform: string; known: number; total: number }[];
+  /** Sources mentioned across ALL answers, including "check Glassdoor" advice. */
+  adviceSourceMix?: Record<string, number>;
+  adviceCompetitor?: { name: string | null; count: number };
 }
 
 // Horizontal gutters: generous on desktop, usable on a 375px phone.
@@ -137,43 +141,6 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
     router.push(`/thanks?audit=${encodeURIComponent(audit.id)}`);
   }
 
-  if (audit.notRecognized) {
-    return (
-      <div className="screen-enter min-h-screen flex flex-col" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
-        <TopNav tone="paper" />
-        <div className="flex-1 flex items-center justify-center px-8">
-          <div className="max-w-[560px] text-center">
-            <div className="eyebrow" style={{ color: '#33D3C9' }}>
-              Not enough signal
-            </div>
-            <h1
-              className="serif mt-4"
-              style={{ fontSize: 'clamp(40px, 5.4vw, 72px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
-            >
-              We couldn't find <em className="italic" style={{ color: '#33D3C9' }}>{audit.companyName}</em> in the
-              conversation.
-            </h1>
-            <p className="mt-5 text-[17px] opacity-75 leading-relaxed">
-              {audit.errorMessage ??
-                "The major AI assistants don't have enough information about this company to score visibility yet."}{' '}
-              That's a finding in itself — and it's exactly what Talivity helps fix.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <button onClick={bookSession} disabled={booking} className="btn-accent inline-flex">
-                Talk to our AI Search team
-                <IconArrowRight size={16} />
-              </button>
-              <Link href="/" className="btn-ghost inline-flex">
-                Run another audit
-              </Link>
-            </div>
-          </div>
-        </div>
-        <FooterBar tone="paper" />
-      </div>
-    );
-  }
-
   const score = audit.score;
   const totalResponses = audit.totalResponses ?? 30;
   const platformsUsed = audit.platformsUsed ?? audit.platforms?.length ?? 3;
@@ -181,7 +148,20 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
   const competitorCount = audit.competitors.competitorCitations;
   const owned = audit.citationsOwned;
 
-  const segments = buildSourceMixSegments(audit.sourceMix, competitorCount, topCompetitor);
+  // Companies AI doesn't recognise get the same report, told from the
+  // invisibility angle: who knew them, and where AI sent candidates instead.
+  const invisible = !!audit.notRecognized;
+  const recognition = audit.recognition ?? [];
+  const hasRecognition = recognition.length > 0;
+  const knownTotal = recognition.reduce((a, r) => a + r.known, 0);
+  const answeredTotal = recognition.reduce((a, r) => a + r.total, 0) || totalResponses;
+  const platformsKnowing = recognition.filter((r) => r.known * 2 > r.total).length;
+
+  const mixSource = invisible ? (audit.adviceSourceMix ?? {}) : audit.sourceMix;
+  const mixCompetitor = invisible
+    ? (audit.adviceCompetitor ?? { name: null, count: 0 })
+    : { name: topCompetitor, count: competitorCount };
+  const segments = buildSourceMixSegments(mixSource, mixCompetitor.count, mixCompetitor.name);
   const mixTotal = segments.reduce((a, s) => a + s.count, 0);
   const ownedPct = segments.find((s) => s.isOwn)?.pct ?? 0;
   const loudest = segments
@@ -196,15 +176,17 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
   const auditIdShort = audit.id.slice(-10).toUpperCase();
 
   // Top third-party source (ties resolve in display order).
-  const topSource = THIRD_PARTY_SOURCES.map((s) => ({ ...s, count: audit.sourceMix[s.key] ?? 0 })).reduce(
+  const topSource = THIRD_PARTY_SOURCES.map((s) => ({ ...s, count: mixSource[s.key] ?? 0 })).reduce(
     (best, s) => (s.count > best.count ? s : best),
     { key: 'none', label: '', tagline: '', count: 0 } as { key: string; label: string; tagline: string; count: number }
   );
 
   const visibleShare = totalResponses ? Math.min(owned, totalResponses) / totalResponses : 0;
   const invisibleTenths = Math.round((1 - visibleShare) * 10);
-  const visibilityLine =
-    invisibleTenths >= 5
+  const unknownTenths = hasRecognition ? Math.round((1 - knownTotal / answeredTotal) * 10) : 10;
+  const visibilityLine = invisible
+    ? `You're invisible in ${unknownTenths} out of 10 candidate searches.`
+    : invisibleTenths >= 5
       ? `You're invisible in ${invisibleTenths} out of 10 candidate searches.`
       : `You're cited in ${10 - invisibleTenths} out of 10 candidate searches — competitors are working to close that gap.`;
 
@@ -218,8 +200,22 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
           ? `${topCompetitor} matches your share of voice — one content push decides who leads.`
           : `You out-cite ${topCompetitor} ${owned} to ${competitorCount}. For now.`;
 
-  const callout =
-    mixTotal === 0
+  const callout = invisible
+    ? mixTotal === 0
+      ? {
+          head: 'AI leaves candidates at a dead end.',
+          body: 'Most answers ended without a source or a next step. Candidates move on to employers AI can actually describe.',
+        }
+      : loudest.length === 0
+        ? {
+            head: 'AI points candidates to your own site.',
+            body: "That's the one channel you control — make sure it answers the questions candidates are asking.",
+          }
+        : {
+            head: 'Third-party sites fill the gap.',
+            body: `${joinNames(loudest)} ${loudest.length === 1 ? 'is' : 'are'} where AI sends candidates to learn about you${ownedPct > 0 ? ` — only ${ownedPct}% of the pointers lead to your own site` : ' — none of the pointers lead to your own site'}.`,
+          }
+    : mixTotal === 0
       ? {
           head: "AI isn't citing anyone — including you.",
           body: 'None of the answers pointed to a source. Candidates get generic answers, and the first employer to publish AI-readable content will own the narrative.',
@@ -237,7 +233,92 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
             body: `${joinNames(loudest)} account for the loudest part of what candidates hear about you. That's the part of the funnel you have the least control over — and the part that talks loudest.`,
           };
 
-  const implications = [
+  const stats: { tone: 'lilac' | 'peach' | 'sage'; big: string; label: string; sub: string }[] = invisible
+    ? [
+        {
+          tone: 'lilac',
+          big: hasRecognition ? `${knownTotal}/${answeredTotal}` : '—',
+          label: `Answers that knew who ${audit.companyName} is`,
+          sub: !hasRecognition
+            ? 'Most answers said they had no reliable information about you.'
+            : knownTotal === 0
+              ? 'None of the AI answers could describe you as an employer.'
+              : `Only ${knownTotal} answer${knownTotal === 1 ? '' : 's'} said anything specific about you.`,
+        },
+        {
+          tone: 'peach',
+          big: hasRecognition ? `${platformsKnowing}/${recognition.length}` : `0/${platformsUsed}`,
+          label: 'AI platforms that recognized you',
+          sub: hasRecognition
+            ? recognition.map((r) => `${r.platform} ${r.known}/${r.total}`).join(' · ')
+            : 'None of the assistants could talk about you with confidence.',
+        },
+        {
+          tone: 'sage',
+          big: ratioOutOf(topSource.count, answeredTotal),
+          label:
+            topSource.count > 0
+              ? `Times AI sent candidates to ${topSource.label} instead`
+              : 'Times AI pointed candidates anywhere else',
+          sub:
+            topSource.count > 0
+              ? "With nothing to say about you, AI points candidates to sites you don't control."
+              : 'Most answers simply ended there — no source, no next step.',
+        },
+      ]
+    : [
+        {
+          tone: 'lilac',
+          big: ratioOutOf(owned, totalResponses),
+          label: `Times you were cited across ${totalResponses} candidate queries`,
+          sub:
+            owned > 0
+              ? `${owned} answer${owned === 1 ? '' : 's'} pointed back at your own content. The rest didn't.`
+              : `Zero answers pointed back at your own content. Candidates are hearing about you from everywhere except you.`,
+        },
+        {
+          tone: 'peach',
+          big: ratioOutOf(competitorCount, totalResponses),
+          label: topCompetitor ? `Times ${topCompetitor} was cited` : 'Times any competitor was cited',
+          sub: competitorSub,
+        },
+        {
+          tone: 'sage',
+          big: ratioOutOf(topSource.count, totalResponses),
+          label:
+            topSource.count > 0
+              ? `Times ${topSource.label} was cited instead of you`
+              : 'Times a review site was cited instead of you',
+          sub:
+            topSource.count > 0
+              ? topSource.tagline
+              : 'AI leaned on general knowledge rather than review sites for these answers.',
+        },
+      ];
+
+  const invisibleImplications = [
+    {
+      icon: <IconEye size={20} />,
+      head: "Candidates can't research you with AI.",
+      body: `${hasRecognition ? `${answeredTotal - knownTotal} of ${answeredTotal}` : 'Most'} answers couldn't say anything specific about ${audit.companyName}. Candidates who vet employers with AI get a shrug — and move on to companies AI can describe.`,
+    },
+    {
+      icon: <IconUsers size={20} />,
+      head: 'Someone else fills the gap.',
+      body: mixCompetitor.name
+        ? `When AI has nothing on you, it suggests alternatives — ${mixCompetitor.name} came up ${mixCompetitor.count} time${mixCompetitor.count === 1 ? '' : 's'}.`
+        : loudest.length
+          ? `When AI has nothing on you, it sends candidates to ${joinNames(loudest)} — sources you don't control.`
+          : 'When AI has nothing on you, candidates fill the gap with whatever they find — or with employers AI can talk about.',
+    },
+    {
+      icon: <IconTarget size={20} />,
+      head: 'Invisible is the easiest place to start.',
+      body: `AI assistants learn from a predictable set of sources. We can show you which ones matter for your roles, and what to publish so AI can answer for ${audit.companyName}.`,
+    },
+  ];
+
+  const implications = invisible ? invisibleImplications : [
     {
       icon: <IconEye size={20} />,
       head:
@@ -292,6 +373,11 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-[14px] opacity-70">
             <span className="pill">{audit.industry}</span>
+            {invisible && (
+              <span className="pill" style={{ background: 'rgba(240,197,85,0.28)', borderColor: 'rgba(240,197,85,0.6)' }}>
+                Not yet recognized by AI
+              </span>
+            )}
             <span>·</span>
             <span>Audit ID {auditIdShort}</span>
             <span>·</span>
@@ -355,36 +441,9 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
 
             <div className="lg:col-span-7">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-                <ResultStat
-                  tone="lilac"
-                  big={ratioOutOf(owned, totalResponses)}
-                  label={`Times you were cited across ${totalResponses} candidate queries`}
-                  sub={
-                    owned > 0
-                      ? `${owned} answer${owned === 1 ? '' : 's'} pointed back at your own content. The rest didn't.`
-                      : `Zero answers pointed back at your own content. Candidates are hearing about you from everywhere except you.`
-                  }
-                />
-                <ResultStat
-                  tone="peach"
-                  big={ratioOutOf(competitorCount, totalResponses)}
-                  label={topCompetitor ? `Times ${topCompetitor} was cited` : 'Times any competitor was cited'}
-                  sub={competitorSub}
-                />
-                <ResultStat
-                  tone="sage"
-                  big={ratioOutOf(topSource.count, totalResponses)}
-                  label={
-                    topSource.count > 0
-                      ? `Times ${topSource.label} was cited instead of you`
-                      : 'Times a review site was cited instead of you'
-                  }
-                  sub={
-                    topSource.count > 0
-                      ? topSource.tagline
-                      : 'AI leaned on general knowledge rather than review sites for these answers.'
-                  }
-                />
+                {stats.map((st) => (
+                  <ResultStat key={st.label} tone={st.tone} big={st.big} label={st.label} sub={st.sub} />
+                ))}
               </div>
 
               <div className="mt-6 md:mt-8 flex items-start gap-3">
@@ -413,15 +472,17 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               className="serif mt-3"
               style={{ fontSize: 'clamp(36px, 4.4vw, 56px)', lineHeight: 1.0, letterSpacing: '-0.02em' }}
             >
-              Where candidates are getting their{' '}
+              {invisible ? 'Where AI sends candidates ' : 'Where candidates are getting their '}
               <em className="italic" style={{ color: '#33D3C9' }}>
-                information
+                {invisible ? 'instead' : 'information'}
               </em>
               .
             </h2>
             <p className="mt-5 text-[15px] leading-relaxed opacity-75 max-w-[420px]">
-              When candidates ask AI about working at {audit.companyName}, here's where the answers come from.{' '}
-              {mixTotal === 0
+              {invisible
+                ? `When AI can't answer candidates' questions about ${audit.companyName}, it points them somewhere else. ${mixTotal === 0 ? "Here, most answers didn't point anywhere at all." : "Here's where."}`
+                : `When candidates ask AI about working at ${audit.companyName}, here's where the answers come from. `}
+              {invisible ? null : mixTotal === 0
                 ? 'None of the answers cited a source — including yours.'
                 : ownedPct === 0
                   ? 'None of the citation mix points back at content you own.'
@@ -468,7 +529,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
                 className="rounded-[14px] px-5 flex items-center text-[13px] opacity-70"
                 style={{ height: 56, border: '1px dashed rgba(14,23,20,0.2)', background: 'var(--paper-warm)' }}
               >
-                No sources were cited in these answers.
+                {invisible ? 'None of the answers pointed candidates anywhere.' : 'No sources were cited in these answers.'}
               </div>
             )}
 
@@ -521,7 +582,9 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
             saying.
           </h2>
           <p className="mt-5 text-[15px] leading-relaxed opacity-75 max-w-[560px]">
-            Raw model responses, captured during this audit. Formatting removed; otherwise word for word.
+            {invisible
+              ? `This is what candidates hear when they ask AI about ${audit.companyName}. Formatting removed; otherwise word for word.`
+              : 'Raw model responses, captured during this audit. Formatting removed; otherwise word for word.'}
           </p>
         </div>
 
@@ -535,7 +598,7 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
           }`}
         >
           {audit.sampleResponses.map((r, i) => (
-            <ResponseCard key={`${r.platform}-${i}`} r={r} />
+            <ResponseCard key={`${r.platform}-${i}`} r={r} sourceLabel={invisible ? 'Points to' : 'Source cited'} />
           ))}
         </div>
       </section>
@@ -620,15 +683,16 @@ export default function ResultsScreen({ audit }: { audit: AuditViewModel }) {
               className="serif mt-4"
               style={{ fontSize: 'clamp(44px, 6vw, 84px)', lineHeight: 0.98, letterSpacing: '-0.02em' }}
             >
-              Want the{' '}
+              {invisible ? 'Want AI to ' : 'Want the '}
               <em className="italic" style={{ color: '#33D3C9' }}>
-                full diagnostic
+                {invisible ? 'know you' : 'full diagnostic'}
               </em>
               ?
             </h2>
             <p className="mt-6 text-[18px] leading-relaxed max-w-[600px]" style={{ color: 'rgba(14,23,20,0.72)' }}>
-              This audit shows where you stand. Our complete four-week diagnostic shows you exactly which queries to
-              win, what's broken on your site, and the roadmap to fix it.
+              {invisible
+                ? "This audit shows AI can't answer candidates' questions about you yet. Our four-week diagnostic shows exactly what to publish, and where, so it can."
+                : "This audit shows where you stand. Our complete four-week diagnostic shows you exactly which queries to win, what's broken on your site, and the roadmap to fix it."}
             </p>
 
             <div className="mt-9 flex flex-wrap items-center gap-4">
@@ -717,8 +781,12 @@ function ResultStat({
           ? 'rgba(51, 211, 201, 0.15)'
           : 'rgba(240, 197, 85, 0.20)';
   return (
-    <div className="rounded-[18px] p-6 flex flex-col h-full card-hover print-avoid-break" style={{ background: bg }}>
-      <div className="serif num" style={{ fontSize: 'clamp(40px, 4vw, 56px)', lineHeight: 0.95, letterSpacing: '-0.03em' }}>
+    <div
+      className="rounded-[18px] p-6 flex flex-col h-full card-hover print-avoid-break"
+      style={{ background: bg, containerType: 'inline-size' }}
+    >
+      {/* Sized to the card (cqi), so "12/30" never spills out of narrow cards. */}
+      <div className="serif num whitespace-nowrap" style={{ fontSize: 'clamp(24px, 33cqi, 52px)', lineHeight: 0.95, letterSpacing: '-0.03em' }}>
         {big}
       </div>
       <div className="mt-5 text-[15px] font-medium leading-snug">{label}</div>
@@ -735,7 +803,13 @@ function previewOf(text: string, max = 460): string | null {
   return (stop > max * 0.5 ? cut.slice(0, stop + 1) : cut.replace(/\s+\S*$/, '')).trim() + ' …';
 }
 
-function ResponseCard({ r }: { r: { platform: string; query: string; response: string; sourceCited: string | null } }) {
+function ResponseCard({
+  r,
+  sourceLabel,
+}: {
+  r: { platform: string; query: string; response: string; sourceCited: string | null };
+  sourceLabel: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const preview = previewOf(r.response);
   return (
@@ -776,8 +850,8 @@ function ResponseCard({ r }: { r: { platform: string; query: string; response: s
       </div>
 
       <div className="mt-auto pt-5 border-t border-black/10 flex items-center justify-between text-[12px]">
-        <span className="mono uppercase tracking-wider opacity-55">Source cited</span>
-        <span className="pill">{r.sourceCited ?? 'No clear source'}</span>
+        <span className="mono uppercase tracking-wider opacity-55">{sourceLabel}</span>
+        <span className="pill">{r.sourceCited ?? (sourceLabel === 'Source cited' ? 'No clear source' : 'Nowhere')}</span>
       </div>
     </div>
   );
