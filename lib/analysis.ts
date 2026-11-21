@@ -33,7 +33,7 @@ function buildPrompt(companyName: string, answers: string[]): string {
   return `Employer: ${companyName}
 
 Label each answer below:
-- "knows": true if the answer contains substantive, company-specific information about ${companyName} (facts, reputation, pay, culture, programs, employee sentiment). false if the assistant says it lacks information about this company, or only gives generic advice (e.g. "check Glassdoor and their careers page") without anything specific to ${companyName}.
+- "knows": does the assistant actually know this employer? true if the answer says ANYTHING specific to ${companyName} — who they are, size, locations, unions, reputation, pay or benefits, programs, what reviews or news say — even if it also hedges about the exact question (e.g. "I don't have current data on their nurse pay, but most of their staff are unionized and reviews praise the benefits" → true). false ONLY if the assistant says it doesn't know or recognize ${companyName}, or the answer is purely generic advice that would read the same for any company (e.g. "I don't have information about this company; check Glassdoor and their careers page" → false).
 - "sentiment": the answer's overall tone about ${companyName} as an employer: "positive", "negative", "mixed", or "neutral". Use "neutral" when "knows" is false.
 
 Return exactly this shape, one entry per answer, in order:
